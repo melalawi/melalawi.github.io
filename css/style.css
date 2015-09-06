@@ -17,11 +17,14 @@ body {
 	font-family: 'Droid Sans', sans-serif; /*Montserrat*/
 }
 
+p {
+	width: 75%;
+}
+
 hr {
-	height: 1px;
-    background: #C3C3C3;
-    font-size: 0;
+    height: 0.25em;
     border: 0;
+    border-bottom: 1px solid #C3C3C3;
 }
 
 h1, h2 {
@@ -152,8 +155,8 @@ sub {
 .pageSegment {
 	padding: 0.5em 1em;
 	overflow-y: auto;
-    margin: auto;
-    text-align: left;
+    width: auto;
+    text-align: justify;
 }
 
 #footer {
