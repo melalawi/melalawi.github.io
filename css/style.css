@@ -1,0 +1,169 @@
+@import url(https://fonts.googleapis.com/css?family=Droid+Sans);
+
+body {
+	padding: 0;
+	margin: 0;
+	
+	height: 100vh;
+	display: flex;
+    flex-direction: row;
+	flex-wrap: nowrap;
+    align-content: stretch;
+    align-items: stretch;
+	
+	background: #EDEDED;
+	
+	color: #2F2F2F;
+	font-family: 'Droid Sans', sans-serif; /*Montserrat*/
+}
+
+hr {
+	height: 1px;
+    background: #C3C3C3;
+    font-size: 0;
+    border: 0;
+}
+
+h1, h2 {
+	margin: 0;
+}
+
+sub {
+	display: block;
+	vertical-align: middle;
+}
+
+#leftColumn {
+	flex: none;
+    order: 0;
+    align-self: stretch;
+	-webkit-align-self: stretch;
+	
+	color: #EDEDED;
+	background: #3F936F;
+}
+
+#rightColumn {	
+	overflow-y: hidden;
+	
+	flex: auto;
+    order: 1;
+    align-self: stretch;
+	height: 100%;
+}
+
+#navColumnHeader {
+	padding: 0.5em 1em;
+	text-align: center;
+}
+
+@media all and (min-width: 769px) {
+	#profileImage {
+		margin: 1em auto;
+	}
+
+	#navColumnHeader h2  {
+		font-size: 1.5em;
+	}
+	
+	#navColumnHeader sub  {
+	    margin-bottom: 1em;
+		font-size: 0.833em;
+	}
+	
+	#footerContent {
+		padding: 2em 1em 1em;
+	}
+}
+
+@media all and (max-width: 768px) and (min-width: 1px) {
+	#profileImage {
+		margin: 1vh auto;
+	}
+	
+	#navColumnHeader h2  {
+		font-size: 2vw;
+	}
+	
+	#navColumnHeader sub  {
+	    margin-bottom: 0.5vh;
+		font-size: 1.25vw;
+	}
+	
+	#footerContent {
+		padding: 1em 1em 1em;
+	}
+}
+
+#profileImage {
+	display: flex;
+	max-width: 192px;
+	width: 15vw;
+	
+	height: auto;
+}
+
+.navButton {
+	width: 100%;
+	padding: 1em 2em;
+	
+	outline: none;
+	border: none;
+	border-radius: 0;
+	
+	color: #FFFFFF;
+	background-color: rgba(0, 0, 0, 0);
+	
+	font-family: 'Droid Sans', sans-serif;
+	text-align: right;
+	font-size: 0.9em;
+	
+	cursor: pointer;
+	transition: 0.15s all;
+}
+
+.navButton:hover {
+	background-color: #277554;
+	padding: 1em 1.50em;
+}
+
+.navButton.active {
+	background-color: #15563A;
+	padding: 1em 1.50em;
+}
+
+#content {
+	display: table;
+	border-collapse: collapse;
+	
+	width: 100%;
+	height: 100%;
+}
+
+#content>div { 
+	display: table-row;
+	width: 100%;
+}
+
+#pageContainer {
+	height: 100%;
+}
+
+.pageSegment {
+	padding: 0.5em 1em;
+	overflow-y: auto;
+    margin: auto;
+    text-align: left;
+}
+
+#footer {
+}
+
+#footerContent {
+	border-top: 1px solid #C3C3C3;
+	width: 95%;
+	margin: auto;
+	
+	font-size: 0.8em;
+	color: #C3C3C3;
+}
