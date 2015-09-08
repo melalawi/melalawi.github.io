@@ -154,8 +154,10 @@ sub {
 
 .pageSegment {
 	padding: 0.5em 1em;
+	max-height: 100%;
 	overflow-y: auto;
     width: auto;
+	
     text-align: justify;
 }
 
