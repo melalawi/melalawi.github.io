@@ -1,7 +1,7 @@
 (function() {
 
 "use strict";
-	
+/*
 const DEFAULT_PAGE = "about";
 
 $(document).ready(function() {
@@ -22,6 +22,6 @@ function setPortfolioPage(pageName) {
 	
 	buttons.filter('#' + pageName + 'Button').addClass('active');
 	pages.filter('#' + pageName + 'Page').css('display', '');
-}
+}*/
 
 }());

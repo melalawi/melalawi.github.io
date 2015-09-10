@@ -4,12 +4,10 @@ body {
 	padding: 0;
 	margin: 0;
 	
+	display: table;
 	height: 100vh;
-	display: flex;
-    flex-direction: row;
-	flex-wrap: nowrap;
-    align-content: stretch;
-    align-items: stretch;
+	width: 100%;
+	min-height: 512px;
 	
 	background: #EDEDED;
 	
@@ -17,8 +15,12 @@ body {
 	font-family: 'Droid Sans', sans-serif; /*Montserrat*/
 }
 
+h1, h2 {
+	margin: 0;
+	white-space: nowrap;
+}
+
 p {
-	width: 75%;
 }
 
 hr {
@@ -27,32 +29,38 @@ hr {
     border-bottom: 1px solid #C3C3C3;
 }
 
-h1, h2 {
-	margin: 0;
-}
-
 sub {
 	display: block;
 	vertical-align: middle;
 }
 
-#leftColumn {
-	flex: none;
-    order: 0;
-    align-self: stretch;
-	-webkit-align-self: stretch;
+.bodyCell {
+	display: table-cell;
+    vertical-align:top;
+	height: 100%;
 	
-	color: #EDEDED;
-	background: #3F936F;
+	padding: 0;
+	margin: 0;
 }
 
-#rightColumn {	
+#navColumn {
+	color: #EDEDED;
+	background: #3F936F;
 	overflow-y: hidden;
-	
-	flex: auto;
-    order: 1;
-    align-self: stretch;
+}
+
+#navTable {
+	display: table;
 	height: 100%;
+}
+
+.navRow {
+	display: table-row;
+}
+
+.navCell {
+	display: table-cell;
+	width: 100%;
 }
 
 #navColumnHeader {
@@ -60,56 +68,24 @@ sub {
 	text-align: center;
 }
 
-@media all and (min-width: 769px) {
-	#profileImage {
-		margin: 1em auto;
-	}
-
-	#navColumnHeader h2  {
-		font-size: 1.5em;
-	}
-	
-	#navColumnHeader sub  {
-	    margin-bottom: 1em;
-		font-size: 0.833em;
-	}
-	
-	#footerContent {
-		padding: 2em 1em 1em;
-	}
-}
-
-@media all and (max-width: 768px) and (min-width: 1px) {
-	#profileImage {
-		margin: 1vh auto;
-	}
-	
-	#navColumnHeader h2  {
-		font-size: 2vw;
-	}
-	
-	#navColumnHeader sub  {
-	    margin-bottom: 0.5vh;
-		font-size: 1.25vw;
-	}
-	
-	#footerContent {
-		padding: 1em 1em 1em;
-	}
+#navColumnBody {
+	height: 100%;
+	overflow-y: none;
 }
 
 #profileImage {
-	display: flex;
-	max-width: 192px;
-	width: 15vw;
+	margin: 1em auto;
+	max-width: 100%;
 	
 	height: auto;
 }
 
 .navButton {
+	display: inline-block;
 	width: 100%;
 	padding: 1em 2em;
 	
+	box-sizing: border-box;
 	outline: none;
 	border: none;
 	border-radius: 0;
@@ -119,10 +95,10 @@ sub {
 	
 	font-family: 'Droid Sans', sans-serif;
 	text-align: right;
+	text-decoration: none;
 	font-size: 0.9em;
 	
 	cursor: pointer;
-	transition: 0.15s all;
 }
 
 .navButton:hover {
@@ -135,40 +111,55 @@ sub {
 	padding: 1em 1.50em;
 }
 
-#content {
+#navColumnFooter {
+	padding: 1em;
+	
+	font-size: 0.75em;
+	white-space: nowrap;
+}
+
+/*content*/
+
+#contentColumn {
+	background: #EDEDED;
+	
+	/*Prioritize this column's width*/
+	width: 100%;
+}
+
+#contentTable {
 	display: table;
-	border-collapse: collapse;
-	
-	width: 100%;
 	height: 100%;
+	width: 98%;
+    margin: auto;
 }
 
-#content>div { 
+.contentRow {
 	display: table-row;
+}
+
+.contentCell {
+	display: table-cell;
 	width: 100%;
+	padding: 0.5em 0;
 }
 
-#pageContainer {
+#contentColumnHeader {	
+	border-bottom: 1px solid #C3C3C3;
+}
+
+#contentColumnBody {
 	height: 100%;
+	padding: 0;
 }
 
-.pageSegment {
-	padding: 0.5em 1em;
-	max-height: 100%;
+#contentColumnBody>div {
+	height: 100%;
 	overflow-y: auto;
-    width: auto;
-	
-    text-align: justify;
+	padding: 0.5em 0;
+	width: 75%;
 }
 
-#footer {
-}
-
-#footerContent {
+#contentColumnFooter {	
 	border-top: 1px solid #C3C3C3;
-	width: 95%;
-	margin: auto;
-	
-	font-size: 0.8em;
-	color: #C3C3C3;
 }
