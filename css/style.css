@@ -1,14 +1,16 @@
 @import url(https://fonts.googleapis.com/css?family=Droid+Sans);
 
+* {
+	padding: 0;
+	margin: 0;
+}
+
 html {
 	height: 100%;
 	width: 100%;
 }
 
 body {
-	padding: 0;
-	margin: 0;
-	
 	display: table;
 	height: 100%;
 	width: 100%;
@@ -20,12 +22,32 @@ body {
 	font-family: 'Droid Sans', sans-serif; /*Montserrat*/
 }
 
+a, a:visited {
+    color: #2C3F52;
+}
+
 h1, h2 {
 	margin: 0;
 	white-space: nowrap;
 }
 
+ul {
+    list-style-type: none;
+    padding: 1em 0;
+}
+
+li, .bullet {
+    font-size: 1.1em;
+    line-height: 2em;
+}
+
+.large {
+    font-size: 1.25em;
+    line-height: 2.5em;
+}
+
 p {
+    padding-top: 1.5em;
 }
 
 hr {
@@ -81,8 +103,22 @@ sub {
 #profileImage {
 	margin: 1em auto;
 	max-width: 100%;
+	width: 100%;
 	
 	height: auto;
+}
+
+.bannerImage {
+    display: block;
+    margin: auto;
+    max-width: 100%;
+    max-height: 384px;
+}
+
+.navButtonContainer {
+    display: inline-block;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .navButton {
@@ -95,7 +131,7 @@ sub {
 	border: none;
 	border-radius: 0;
 	
-	color: #FFFFFF;
+	color: #FFFFFF !important;
 	background-color: rgba(0, 0, 0, 0);
 	
 	font-family: 'Droid Sans', sans-serif;
@@ -115,6 +151,37 @@ sub {
 .navButton.active {
 	background-color: #0C2033;
 	padding: 1em 1.50em;
+}
+
+.navButtonMini {
+	display: inline-block;
+	width: 100%;
+	padding: 0.75em 1.50em;
+	
+	box-sizing: border-box;
+	outline: none;
+    border-top: 1px solid rgba(97, 117, 136, 0.5);
+    border-bottom: 1px solid rgba(97, 117, 136, 0.5);
+	border-radius: 0;
+	
+	color: #FFFFFF !important;
+	background-color: #617588;
+	
+	font-family: 'Droid Sans', sans-serif;
+	text-align: right;
+	text-decoration: none;
+	font-size: 0.75em;
+	
+	cursor: pointer;
+	transition: 0.25s all;
+}
+
+.navButtonMini:hover {
+	background-color: #42596F;
+}
+
+.navButtonMini.active {
+	background-color: #0C2033;
 }
 
 #navColumnFooter {
@@ -163,10 +230,8 @@ sub {
 	height: 100%;
 	overflow-y: auto;
 	padding: 0.5em 0;
-	width: 75%;
 }
 
-/*animation test*/
 .previewPanel {
 	display: inline-block;
 	position: relative;
@@ -214,11 +279,17 @@ sub {
 
 .panelInner h2 {
 	margin: 2.5% 0;
+    
 	font-size: 1.75em;
+    cursor: default;
 }
 
 .panelInner sub {
+	margin: 2.5% 0;
+    height: 33px;
+    
 	font-size: 0.8em;
+    cursor: default;
 }
 
 .panelInner a {
@@ -237,9 +308,19 @@ sub {
 	text-align: center;
 }
 
-.previewPanel#project-GlobalTwitchEmotes  .panelCover {	background: url('images/gte.png'); background-size: contain;	}
-.previewPanel#project-Genotify  .panelCover {	background: url('images/gene.png'); background-size: contain;	}
+.previewPanel#project-GTE  .panelCover {	background: url('../images/gte/small.png'); background-size: contain;	}
+.previewPanel#project-GENE  .panelCover {	background: url('../images/gene/small.png'); background-size: contain;	}
+.previewPanel#project-UUGE  .panelCover {	background: url('../images/uuge/small.png'); background-size: contain;	}
 
 #contentColumnFooter {	
 	border-top: 1px solid #C3C3C3;
+}
+
+#contentColumnFooter img {
+    float: right;
+    opacity: 0.5;
+}
+
+#contentColumnFooter img:hover {
+    opacity: 1;
 }
