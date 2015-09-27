@@ -232,6 +232,16 @@ sub {
 	padding: 0.5em 0;
 }
 
+.screenshot {
+    max-width: 256px;
+    height: auto;
+}
+
+.inline {
+    font-size: 0.8em;
+    text-align: center;
+}
+
 .previewPanel {
 	display: inline-block;
 	position: relative;
@@ -308,9 +318,9 @@ sub {
 	text-align: center;
 }
 
-.previewPanel#project-GTE  .panelCover {	background: url('../images/gte/small.png'); background-size: contain;	}
-.previewPanel#project-GENE  .panelCover {	background: url('../images/gene/small.png'); background-size: contain;	}
-.previewPanel#project-UUGE  .panelCover {	background: url('../images/uuge/small.png'); background-size: contain;	}
+.previewPanel#project-GTE  .panelCover {	background: url('../images/gte-small.png'); background-size: contain;	}
+.previewPanel#project-GENE  .panelCover {	background: url('../images/gene-small.png'); background-size: contain;	}
+.previewPanel#project-UUGE  .panelCover {	background: url('../images/uuge-small.png'); background-size: contain;	}
 
 #contentColumnFooter {	
 	border-top: 1px solid #C3C3C3;
