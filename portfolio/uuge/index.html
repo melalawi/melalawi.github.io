@@ -53,33 +53,39 @@
 			<div class="contentRow">
 				<div class="contentCell" id="contentColumnHeader">
 					<div>
-						<h1>Global Twitch Emotes</h1>
-                        <a target="_blank" href="https://github.com/melalawi/GlobalTwitchEmotes"><img src="/images/github.png" alt="View Project on Github"></a>
-                        <a target="_blank" href="https://chrome.google.com/webstore/detail/global-twitch-emotes/pgniedifoejifjkndekolimjeclnokkb"><img src="/images/chrome.png" alt="View Chrome Listing"></a>
-                        <a target="_blank" href="https://addons.mozilla.org/en-US/firefox/addon/globaltwitchemotes/"><img src="/images/firefox.png" alt="View Firefox Listing"></a>
-                        <a target="_blank" href="https://addons.opera.com/en/extensions/details/global-twitch-emotes/"><img src="/images/opera.png" alt="View Opera Listing"></a>
+						<h1>Unofficial Ultimate-Guitar Enhancer</h1>
+                        <a target="_blank" href="https://github.com/melalawi/UUGE"><img src="/images/github.png" alt="View Project on Github"></a>
 					</div>
 				</div>
 			</div>
 			<div class="contentRow">
 				<div class="contentCell" id="contentColumnBody">
 					<div>
-						<img class="bannerImage" src="images/marquee.png" alt="Global Twitch Emotes Banner">
+						<img class="bannerImage" src="images/marquee.png" alt="Unofficial Ultimate-Guitar Enhancer Banner">
                         
                         <h1>Summary</h1>
                         <hr>
-                        <p>Global Twitch Emotes was my first browser extension, and subsequently my first foray into the realm of web programming. When installed, this extension scans through any opened webpages for recognized string patterns and replaces them with the appropriate "Twitch.tv" emoticon.</p><br>
+                        <p><a target="_blank" href="http://www.ultimate-guitar.com">Ultimate-Guitar.com</a> is a very large website geared towards musicians such as myself (although most aren't as mediocre as I am). I've been a part of this community for over five years now, and despite how archaic and deprecated the forum's layout was (images often skewed the layout of threada, users were restricted to tiny, insignificant avatars, a number of features were simply broken, and customization was next to none), I stuck around.
                         
-                        <h1>How It Works</h1>
-                        <hr>
-                        <p>Global Twitch Emotes is a typical browser extension that utilizes both content scripts and background scripts. The background scripts exist as a singleton for the lifetime of the extension, providing required data to the content scripts (which are instantiated for each open browser tab).</p>
+                        Eventually, I decided to respond to the countless unanswered feature requests and bug reports myself by creating a browser extension. I started off small, with only the goal of giving users the ability to upload larger avatar images to their accounts, but eventually the scope of this project grew at an exciting (but still manageable!) rate. At this point, UUGE is capable of:</p>
+                        
+                        <ul>
+                            <li>Larger Forum Avatars</li>
+                            <li>Embedding Modern Media Types, such as .webm</li>
+                            <li>Displaying Images within Post Signatures</li>
+                            <li>Hiding Posts and Threads Made by Ignored Users</li>
+                            <li>Custom Forum Colours/CSS</li>
+                        </ul>
                         
                         <div class="inline">
-                            <img class="inline" src="images/example.png">
-                            <div class="caption">An example of one of the JSON documents.</div>
+                            <img class="inline" src="images/ug-default.png">
+                            <div class="caption">The Default Ultimate-Guitar Forum.</div>
                         </div>
                         
-                        <p>Upon initialization, the background script retrieves and parses the latest versions of JSON emoticon lists from certain, predefined urls, and organizes them in a string-indexed collection. This collection is then passed on to the content scripts where it'll act as a dictionary of emoticon strings.</p><br>
+                        <div class="inline">
+                            <img class="inline" src="images/ug-enhanced1.png">
+                            <div class="caption">UUGE-Enhanced Forum. Note that this is only one possible customization of countless.</div>
+                        </div><br>
                         
                         <h1>Screenshots</h1>
                         <hr>
@@ -87,6 +93,7 @@
                         <a target="_blank" href="images/screenshot1.png"><img class="screenshot" src="images/screenshot1.png"></a>
                         <a target="_blank" href="images/screenshot2.png"><img class="screenshot" src="images/screenshot2.png"></a>
                         <a target="_blank" href="images/screenshot3.png"><img class="screenshot" src="images/screenshot3.png"></a>
+                        <a target="_blank" href="images/screenshot4.png"><img class="screenshot" src="images/screenshot4.png"></a>
 					</div>
 				</div>
 			</div>

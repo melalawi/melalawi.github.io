@@ -225,7 +225,6 @@ sub {
 }
 
 #contentColumnHeader a {
-    float: right;
     padding-left: 0.25em;
 }
 
