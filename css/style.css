@@ -224,18 +224,22 @@ sub {
 	border-bottom: 1px solid #C3C3C3;
 }
 
-#contentColumnHeader a {
+.projectLinks {
     padding-left: 0.25em;
 }
 
-#contentColumnHeader img {
-    max-height: 16px;
+.projectLinks a {
+    padding-left: 0.25em;
+}
+
+.projectLinks img {
+    max-height: 24px;
     width: auto;
     
     opacity: 0.2;
 }
 
-#contentColumnHeader img:hover {
+.projectLinks img:hover {
     opacity: 0.5;
 }
 
