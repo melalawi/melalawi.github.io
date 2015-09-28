@@ -233,11 +233,22 @@ sub {
 }
 
 .screenshot {
+    padding-top: 1.5em;
+    padding-right: 0.5em;
+    
     max-width: 256px;
     height: auto;
 }
 
 .inline {
+    display: inline-block;
+    padding: 1em 0;
+}
+
+.inline .text {
+    padding: 0.2em 0;
+    display: block;
+    
     font-size: 0.8em;
     text-align: center;
 }
