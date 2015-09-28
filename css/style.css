@@ -241,11 +241,10 @@ sub {
 }
 
 .inline {
-    display: inline-block;
     padding: 1em 0;
 }
 
-.inline .text {
+.inline .caption {
     padding: 0.2em 0;
     display: block;
     
