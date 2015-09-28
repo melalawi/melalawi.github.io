@@ -225,6 +225,7 @@ sub {
 }
 
 .projectLinks {
+    display: inline;
     padding-left: 0.25em;
 }
 
