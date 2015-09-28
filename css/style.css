@@ -27,6 +27,7 @@ a, a:visited {
 }
 
 h1, h2 {
+    display: inline;
 	margin: 0;
 	white-space: nowrap;
 }
@@ -110,7 +111,9 @@ sub {
 
 .bannerImage {
     display: block;
+    padding: 1em 0;
     margin: auto;
+    
     max-width: 100%;
     max-height: 384px;
 }
@@ -221,6 +224,22 @@ sub {
 	border-bottom: 1px solid #C3C3C3;
 }
 
+#contentColumnHeader a {
+    float: right;
+    padding-left: 0.25em;
+}
+
+#contentColumnHeader img {
+    max-height: 16px;
+    width: auto;
+    
+    opacity: 0.2;
+}
+
+#contentColumnHeader img:hover {
+    opacity: 0.5;
+}
+
 #contentColumnBody {
 	height: 100%;
 	padding: 0;
@@ -240,7 +259,8 @@ sub {
     height: auto;
 }
 
-.inline {
+div.inline {
+    text-align: center;
     padding: 1em 0;
 }
 
