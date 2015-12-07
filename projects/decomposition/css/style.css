@@ -1,14 +1,25 @@
 body {
-    background-color: #111111;
+    font-family: helvetica;
+    background-color: #EEEEEE;
 }
 
-canvas#main {
-    margin-left: auto;
-    margin-right: auto;
-    margin-top: 128px;
+#container {
+    width: 100%;
+    display: block;
+}
+
+.center {
+    display: inline-block;
+}
+
+canvas#searchSpace {
     display: block;
     box-sizing: border-box;
     
     border: 5px solid #000;
     background-color: #EEEEEE;
+}
+
+input.button {
+    display: inline-block;
 }

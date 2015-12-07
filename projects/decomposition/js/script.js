@@ -1,22 +1,38 @@
 (function(){
 
+/*
+todo:
+min triangle area
+actual button to begin decomposition
+explanation
+ */
+
 var CANVAS_SIZE = 800;
 var POLYGON_FILL_COLOR = '#000000';
-var MIN_CELL_SIZE = 25;
+var MIN_CELL_SIZE = 20;
+
+var circleInterval = 0;
+var circleSize = 10;
+var circleDir = -0.1;
+
+var shiftDown = false;
+
+var mouse = {
+    x: -1,
+    y: -1
+};
 
 var searchSpace = new Space(CANVAS_SIZE);
-var trianglePoints = [];
+var pending = [];
 
 function initialize() {
     searchSpace.initialize();
     searchSpace.redraw();
-
-    document.body.appendChild(searchSpace.getCanvas());
 }
 
 function Space(size) {
     var self = this;
-    var canvas = document.createElement('canvas');
+    var canvas = document.getElementById('searchSpace');
     var context = canvas.getContext('2d');
 
     var tree = null;
@@ -28,7 +44,7 @@ function Space(size) {
     };
 
     this.initialize = function() {
-        canvas.id = 'main';
+        canvas.id = 'searchSpace';
 
         canvas.width = CANVAS_SIZE;
         canvas.height = CANVAS_SIZE;
@@ -51,20 +67,54 @@ function Space(size) {
     this.redraw = function() {
         context.clearRect(0, 0, canvas.width, canvas.height);
 
-        for (var i = 0; i < self.triangles.length; ++i) {
-            self.triangles[i].draw(context);
-        }
-
-        for (var i = 0; i < trianglePoints.length; ++i) {
-            context.fillStyle = '#FF0000';
-            context.fillRect(trianglePoints[i].x, trianglePoints[i].y, 2, 2);
-        }
-
         if (tree !== null) {
             tree.draw(context);
-        }
+        } else {
+            for (var i = 0; i < self.triangles.length; ++i) {
+                self.triangles[i].draw(context);
+            }
 
-        drawLines();
+            if (pending.length === 1) {
+                context.strokeStyle = '#333';
+                context.fillStyle = '#333';
+                context.lineWidth = 2;
+                context.beginPath();
+                context.moveTo(pending[0].x, pending[0].y);
+
+                if (shiftDown === false) {
+                    context.lineTo(mouse.x, pending[0].y);
+                    context.lineTo(mouse.x, mouse.y);
+                    context.lineTo(pending[0].x, mouse.y);
+                    context.fill();
+                    context.stroke();
+                } else {
+                    context.lineTo(mouse.x, mouse.y);
+                    context.stroke();
+                }
+
+                context.fillStyle = '#000000';
+                context.beginPath();
+                context.arc(pending[0].x, pending[0].y, circleSize, 2 * Math.PI, false);
+                context.fill();
+            } else if (pending.length === 2) {
+                context.strokeStyle = '#333';
+                context.fillStyle = '#333';
+                context.lineWidth = 2;
+                context.beginPath();
+                context.moveTo(pending[0].x, pending[0].y);
+                context.lineTo(pending[1].x, pending[1].y);
+                context.lineTo(mouse.x, mouse.y);
+                context.stroke();
+                context.fill();
+            }
+
+            context.fillStyle = '#000000';
+            context.beginPath();
+            context.arc(mouse.x, mouse.y, circleSize, 2 * Math.PI, false);
+            context.fill();
+
+            drawLines();
+        }
     };
 
     function drawLines() {
@@ -86,43 +136,117 @@ function Space(size) {
         }
     }
 
-    // Decompose
-    function decompose() {
-        tree = new QuadTree(CANVAS_SIZE, CANVAS_SIZE);
-
-        tree.applyDecomposition();
+    function resetSpace() {
+        tree = null;
+        self.triangles = [];
 
         self.redraw();
     }
 
+    // Decompose
+    function decompose() {
+        if (tree === null) {
+            tree = new QuadTree(CANVAS_SIZE, CANVAS_SIZE);
+
+            tree.applyDecomposition();
+
+            self.redraw();
+        }
+    }
+
     // Event handlers
     function onClick(event) {
-        var pos = {
-            x: event.clientX - canvas.offsetLeft - 10,
-            y: event.clientY - canvas.offsetTop - 10
-        };
+        if (tree === null) {
+            var pos = {x: 0, y: 0};
 
-        pos.x = MIN_CELL_SIZE * Math.round(Math.abs(pos.x / MIN_CELL_SIZE));
-        pos.y = MIN_CELL_SIZE * Math.round(Math.abs(pos.y / MIN_CELL_SIZE));
+            pos.x = mouse.x;
+            pos.y = mouse.y;
 
-        trianglePoints.push(pos);
+            pending.push(pos);
 
-        if (trianglePoints.length == 3) {
-            self.triangles.push(
-                new Triangle(trianglePoints)
-            );
+            if (pending.length === 3) {
+                var onlyTri = new Triangle(pending);
 
-            trianglePoints = [];
+                if (onlyTri.area() > 0) {
+                    self.triangles.push(onlyTri);
+                }
 
-            if (self.triangles.length === 5) {
-                decompose();
+                pending = [];
+
+            } else if (pending.length === 2 && shiftDown === false) {
+                var triOne = new Triangle([
+                        {x: pending[0].x, y: pending[0].y},
+                        {x: pending[1].x, y: pending[0].y},
+                        {x: pending[1].x, y: pending[1].y}
+                    ]),
+                    triTwo = new Triangle([
+                        {x: pending[1].x, y: pending[1].y},
+                        {x: pending[0].x, y: pending[1].y},
+                        {x: pending[0].x, y: pending[0].y}
+                    ]);
+
+                if (triOne.area() > 0) {
+                    self.triangles.push(triOne, triTwo);
+                }
+
+                pending = [];
             }
+
+            self.redraw();
+        }
+    }
+
+    function onMouseMove(event) {
+        if (tree === null) {
+            mouse.x = event.pageX - canvas.offsetLeft - (MIN_CELL_SIZE / 2);
+            mouse.y = event.pageY - canvas.offsetTop - (MIN_CELL_SIZE / 2);
+
+            mouse.x = MIN_CELL_SIZE * Math.round(Math.abs(mouse.x / MIN_CELL_SIZE));
+            mouse.y = MIN_CELL_SIZE * Math.round(Math.abs(mouse.y / MIN_CELL_SIZE));
+
+            //self.redraw();
+        }
+    }
+
+    function scaleCircle() {
+        circleSize += circleDir;
+
+        if (circleSize <= 1 || circleSize >= 5) {
+            circleSize = Math.max(1, Math.min(circleSize, 5));
+            circleDir *= -1;
         }
 
         self.redraw();
     }
 
+    setInterval(scaleCircle, 10);
+
+    document.onkeydown = function(event) {
+        var key = event || window.event;
+
+        key = key.keyCode;
+
+        // Shift
+        if (key === 16) {
+            shiftDown = true;
+        }
+    };
+
+    document.onkeyup = function(event) {
+        var key = event || window.event;
+
+        key = key.keyCode;
+
+        // Shift
+        if (key === 16) {
+            shiftDown = false;
+        }
+    };
+
     canvas.addEventListener('click', onClick, false);
+    canvas.addEventListener('mousemove', onMouseMove, false);
+    document.getElementById('resetButton').addEventListener('click', resetSpace);
+    document.getElementById('decomposeButton').addEventListener('click', decompose);
 }
 
 function Triangle(points) {
@@ -150,6 +274,10 @@ function Triangle(points) {
         };
     }
 
+    this.area = function() {
+        return Math.abs(((self.verts[0].x - self.verts[2].x) * (self.verts[1].y - self.verts[0].y) - (self.verts[0].x - self.verts[1].x) * (self.verts[2].y - self.verts[0].y)) / 2);
+    };
+
     this.coarseIntersectionTest = function(x, y, w, h) {
         return self.bbox.x < x + w && self.bbox.x + self.bbox.w > x && self.bbox.y < y + h && self.bbox.y + self.bbox.h > y;
     };
@@ -167,7 +295,10 @@ function Triangle(points) {
     };
 
     this.draw = function(cxt) {
+        
         cxt.fillStyle = POLYGON_FILL_COLOR;
+        cxt.strokeStyle = POLYGON_FILL_COLOR;
+        cxt.lineWidth = 1;
         cxt.beginPath();
 
         if (self.verts.length) {
@@ -180,6 +311,8 @@ function Triangle(points) {
 
         cxt.closePath();
         cxt.fill();
+        cxt.stroke();
+        
     };
 
     // For point in triangle test
@@ -206,7 +339,7 @@ function QuadTree(baseWidth, baseHeight) {
             // Mixed, blocked, or free
             node.passable = getPassable(node);
 
-            if (node.passable === 'mixed') {
+            if (node.passable === 'mixed-containing' || node.passable === 'mixed-intersecting') {
                 node.subDivide();
 
                 decompose(node.topLeft);
@@ -215,9 +348,20 @@ function QuadTree(baseWidth, baseHeight) {
                 decompose(node.botRight);
 
                 // False positive check
-                if (node.hasChildren() === false || (node.topLeft.passable === 'yes' && node.topRight.passable === 'yes' && node.botLeft.passable === 'yes' && node.botRight.passable === 'yes')) {
-                    node.passable = 'yes';
-                    node.unite();
+                if (node.hasChildren() === false) {
+                    if (node.passable === 'mixed-containing') {
+                        node.passable = 'yes';
+                    } else if(node.passable === 'mixed-intersecting') {
+                        node.passable = 'no';
+                    }
+                } else {
+                    if (node.topLeft.passable === 'no' && node.topRight.passable === 'no' && node.botLeft.passable === 'no' && node.botRight.passable === 'no') {
+                        node.passable = 'no';
+                        node.unite();
+                    } else if (node.topLeft.passable === 'yes' && node.topRight.passable === 'yes' && node.botLeft.passable === 'yes' && node.botRight.passable === 'yes') {
+                        node.passable = 'yes';
+                        node.unite();
+                    }
                 }
             }
         }
@@ -261,11 +405,11 @@ function QuadTree(baseWidth, baseHeight) {
             result = 'no';
         } else if (closeCount === 0 && openCount >= 0) {
             result = 'yes';
+        } else if (openCount / closeCount ===  4) {
+            result = 'mixed-containing';
         } else {
-            result = 'mixed';
+            result = 'mixed-intersecting';
         }
-
-        console.log('o: ' + openCount + ', c: ' + closeCount + ', result: ' + result);
 
         return result;
     }
@@ -305,7 +449,6 @@ function QuadNode(x, y, w, h) {
         var halfH = size.h / 2;
 
         if (halfW > 5 && halfH > 5) {
-            //console.log('Subdivide (' + position.x + ', ' + position.y + ', ' + size.w + ', ' + size.h + '): [' + halfW + ', ' + halfH + ']');
 
             self.topLeft = new QuadNode(position.x, position.y, halfW, halfH);
             self.topRight = new QuadNode(position.x + halfW, position.y, halfW, halfH);
@@ -336,6 +479,8 @@ function QuadNode(x, y, w, h) {
     }
 
     this.draw = function(cxt) {
+
+        
         cxt.fillStyle = getFill();
         cxt.strokeStyle = '#000000';
         cxt.lineWidth = 2;
@@ -355,6 +500,8 @@ function QuadNode(x, y, w, h) {
         if (self.botRight) {
             self.botRight.draw(cxt);
         }
+
+        
     };
 }
 
