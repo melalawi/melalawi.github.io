@@ -14,17 +14,33 @@
 </head>
 <body>
 	<div id="container">
-    <h1>Quadtree Decomposition Demo</h1>
-    <i>Last Edited - 07/12/2015</i> 
-    <h2>By Mohamed El-Alawi</h2>
-    <h2>Student Number: 7707339</h2>
-    <h2>COMP 3190 - John Anderson</h2>
+        <h1>Quadtree Decomposition Demo</h1>
+        <i>Last Edited - 07/12/2015</i> 
+        <h2>By Mohamed El-Alawi</h2>
+        <h2>Student Number: 7707339</h2>
+        <h2>COMP 3190 - John Anderson</h2>
+        <i>Tested on Chrome - Description below</i><br>
         <canvas class="center" id="searchSpace"></canvas><br>
         <div class="center">
             <input class="button" id="resetButton" type="button" value="Reset Space">
             <input class="button" id="decomposeButton" type="button" value="Begin Decomposition">
         </div>
     </div>
+    
+    
+    <h2>Description</h2>
+    <p>I've implemented a very simple example of quadtree cell decomposition in two-dimensional space.</p>
+    
+    <p>The grid above represents the search space. Click anywhere in the grid to build obstacles and walls that will be considered when decomposing the space into a quadtree.</p>
+    <p class="tab"><b>Generating rectangles:</b> Every two clicks will define the corners of a rectangle.</p>
+    <p class="tab"><b>Generating triangles:</b> Hold down shift before the second click to define a triangle.</p>
+    
+    <p>Clicking 'Begin Decomposition' will begin the cell decomposition process. A visual representation of the final tree will appear after the process is complete</p>
+    <p>Green blocks represent 'free' cells, while the red ones represent impassable cells.</p>
+    <p>Due to a hard limit imposed on the lowest possible granularity level for optimization reasons, the final tree may not perfectly align with the obstacles defined (especially evident with triangles).</p>
+    <br>
+    <a target="_blank" href="./js/script.js">Source code</a>
+    
 </body>
     <script src="./js/script.js"></script>
 </html>

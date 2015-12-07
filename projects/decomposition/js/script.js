@@ -1,10 +1,12 @@
 (function(){
 
 /*
-todo:
-min triangle area
-actual button to begin decomposition
-explanation
+ * script.js
+ * Written by: Mohamed El-Alawi
+ * Last edited: 07/12/2015
+ * Purpose: Demonstrating Quadtree Decomposition
+ *
+ * TODO: Clean up the code....
  */
 
 var CANVAS_SIZE = 800;
