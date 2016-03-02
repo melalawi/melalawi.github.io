@@ -1,5 +1,6 @@
 /*
  * Unofficial Ultimate Guitar Enhancer - Avatar Image code excerpt.
+ * http://melalawi.github.io/codeSamples/avatar.js
  *
  * Implements swapping of forum avatar urls.
  * Written by Mohamed El-Alawi
@@ -12,7 +13,6 @@
 (function(){ 
 	function Avatar(inputNode) {
 		var imageNode = inputNode;
-		var useCustomAvatar = false;
 		var successfullyLoaded = false;
 		var defaultImageSrc = null;
 		var customImageSrc = null;
@@ -20,38 +20,27 @@
 		/*
 		Global Function setCustomImageSrc(String)
 		Does a HEAD request of the provided url to make sure it abides by file size standard.
-		Then it stores the src of the custom image.
+		If source provided leads to a valid image, store it for use later.
 		*/
 		this.setCustomImageSrc = function(newSrc) {
-			var headRequest = new XMLHttpRequest();
-			
-			customImageSrc = newSrc;
-			
-			headRequest.timeout = UUGE_LIB.CONSTANTS.TIMEOUT;
-			headRequest.onreadystatechange = function() {
-				if (this.readyState === 4) {
-					// Success
-					if (this.status === 200) {
-						// Checking if image and if it's not too larger
-						var isImage = this.getResponseHeader('Content-Type').indexOf('image') > -1;
-						var validSize = this.getResponseHeader('Content-Length') <= UUGE_LIB.CONSTANTS.MAX_AVATAR_FILE_SIZE;
-						
-						// Reset customImageSrc if it leads to a bad image (or no image)
-						if (!isImage || !validSize) {
-							customImageSrc = null;
-						}
-					} else {
-						// Failure
-						customImageSrc = null;
-					}
+			var success = function(xmlRequest) {
+				// Checking if image and if it's not too larger
+				var isImage = xmlRequest.getResponseHeader('Content-Type').indexOf('image') > -1;
+				var validSize = xmlRequest.getResponseHeader('Content-Length') <= UUGE_LIB.CONSTANTS.MAX_AVATAR_FILE_SIZE;
+				
+				// Only 
+				if (isImage && validSize) {
+					customImageSrc = newSrc;
+				} else {
+					customImageSrc = null;
 				}
 			};
-			// Also fail on timeout
-			headRequest.ontimeout = function () {
-				customImageSrc = null; 
+			var failure = function(xmlRequest) {
+				// Reset customImageSrc if it leads to a bad image (or no image)
+				customImageSrc = null;
 			};
 			
-			headRequest.send();
+			UUGE_LIB.xmlRequest('head', newSrc, success, failure);
 		};
 
 		/*
@@ -88,7 +77,7 @@
 		Scales the image within the defined constant dimensions whilst maintaining aspect ratio.
 		*/
 		function onAvatarLoad() {		
-			var scaledDimensions = UUGE_LIB.scaleImage(imageNode.naturalWidth, imageNode.naturalHeight, UUGE_LIB.CONSTANTS.MAX_AVATAR_WIDTH, UUGE_LIB.CONSTANTS.MAX_AVATAR_HEIGHT, UUGE_SETTINGS.scaleUpSmallAvatars);
+			var scaledDimensions = UUGE_LIB.scaleImage(imageNode.naturalWidth, imageNode.naturalHeight, UUGE_LIB.CONSTANTS.MAX_AVATAR_WIDTH, UUGE_LIB.CONSTANTS.MAX_AVATAR_HEIGHT, UUGE_SETTINGS.getVariable('scaleUpSmallAvatars'));
 			
 			imageNode.width = scaledDimensions.width;
 			imageNode.height = scaledDimensions.height;
@@ -144,6 +133,29 @@ var UUGE_LIB = (function(){
 		//...
 		TIMEOUT: 5000 // Generous 5 seconds time limit
 	};
+	
+	this.ajaxRequest = function(type, url, onSuccess, onFailure) {
+		var xmlRequest = new XMLHttpRequest();
+		
+		xmlRequest.timeout = UUGE_LIB.CONSTANTS.TIMEOUT;
+		xmlRequest.onreadystatechange = function() {
+			if (this.readyState === 4) {
+				// Success
+				if (this.status === 200) {
+					onSuccess(this);
+				} else {
+					onFailure(this);
+				}
+			}
+		};
+		// Also fail on timeout
+		xmlRequest.ontimeout = function () {
+			onFailure(xmlRequest);
+		};
+		
+		xmlRequest.open(type, url);
+		xmlRequest.send();
+	};
 
 	/*
 	Global Function scaleImage(integer, integer, integer, integer, boolean)
@@ -163,7 +175,7 @@ var UUGE_LIB = (function(){
 			width: Math.round(imageWidth * imageRatio),
 			height: Math.round(imageHeight * imageRatio)
 		};
-	}
+	};
 	
 })();
 
@@ -198,6 +210,6 @@ var UUGE_SETTINGS = (function(){
 		}
 		
 		return result;
-	}
+	};
 
 })();
