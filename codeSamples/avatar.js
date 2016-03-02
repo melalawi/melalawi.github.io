@@ -115,7 +115,7 @@
 				
 				imageNode.src = newSrc;
 			}
-		}
+		};
 		
 		initialize();
 	}
