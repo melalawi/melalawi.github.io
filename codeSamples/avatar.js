@@ -2,7 +2,7 @@
  * Unofficial Ultimate Guitar Enhancer - Avatar Image code excerpt.
  * http://melalawi.github.io/codeSamples/avatar.js
  *
- * Taken from my Unofficial Ultimate-Guitar Enhancer Extension (http://melalawi.github.io/portfolio/uuge/index.html)
+ * Taken from my Unofficial Ultimate-Guitar Enhancer Extension
  * Given an image node (representing a forum user's avatar), we implement a convenient way of swapping.
  * between the default image src (limited by archaic forum standards) and an optional, user-defined custom image.
  * Emphasis is placed on making sure that all foreign input is checked for correctness.

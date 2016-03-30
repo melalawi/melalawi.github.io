@@ -354,7 +354,6 @@ div.inline {
 
 .previewPanel#project-GTE  .panelCover {	background: url('../images/gte-small.png'); background-size: contain;	}
 .previewPanel#project-GENE  .panelCover {	background: url('../images/gene-small.png'); background-size: contain;	}
-.previewPanel#project-UUGE  .panelCover {	background: url('../images/uuge-small.png'); background-size: contain;	}
 
 #contentColumnFooter {	
 	border-top: 1px solid #C3C3C3;
