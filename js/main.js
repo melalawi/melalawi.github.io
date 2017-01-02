@@ -2,29 +2,28 @@
 'use strict';
 
 
-var sideElement;
 var sidebar;
+var togglebar;
 
 
 function init() {
-    sideElement = document.getElementById('side');
-    sidebar = document.getElementById('sidebar');
+    sidebar = document.getElementById('side');
+    togglebar = document.getElementById('togglebar');
 
     document.getElementById('sidebarToggleButton').onclick = function() {
-        if (sideElement.getAttribute('hidden') === 'true') {
-            sideElement.style.marginLeft = '0px';
+        var marginLeft = window.getComputedStyle(sidebar).getPropertyValue('margin-left');
 
-            sideElement.setAttribute('hidden', 'false');
+        console.log(marginLeft);
+
+        if (marginLeft.indexOf('-') !== -1) {
+            sidebar.style.marginLeft = '0';
+            togglebar.className = 'right';
         } else {
-            var hiddenDistance = sidebar.offsetWidth;
-
-            sideElement.style.marginLeft = '-' + hiddenDistance + 'px';
-
-            sideElement.setAttribute('hidden', 'true');
+            sidebar.style.marginLeft = '-100%';
+            togglebar.className = 'left';
         }
     };
 }
-
 
 document.addEventListener('DOMContentLoaded', init);
 },{}]},{},[1]);
