@@ -42,7 +42,14 @@
 
 	{% if site.data.settings.advanced_settings.analytics_code %}
 	<!-- Analytics Code -->
-	{{ site.data.settings.advanced_settings.analytics_code }}
+	<script async src="https://www.googletagmanager.com/gtag/js?id={{ site.data.settings.advanced_settings.analytics_code }}"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+
+		gtag('config', '{{ site.data.settings.advanced_settings.analytics_code }}');
+	</script>
 	{% endif %}
 
 	{% if site.data.settings.advanced_settings.header_js %}
@@ -95,8 +102,6 @@
 	var randomImageNumber = Math.floor(Math.random() * splashImageCount) + 1;
 	
 	var splash = document.getElementById('splash-image');
-
-	console.log(splash);
 	
 	if (splash) {
 		splash.src = '/images/splash/' + randomImageNumber + '.jpg';

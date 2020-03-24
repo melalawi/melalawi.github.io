@@ -4,7 +4,7 @@ description: Feel free to drop a word.
 featured_image: /images/sidebar/7.jpg
 ---
 
-I can be reached via my email at [itsmoalawi@gmail.com](mailto:itsmoalawi@gmail.com?subject=Reaching%20Out%20Re%3A&body=).
+I can be reached via my email at [mo@itsmo.me](mailto:mo@itsmo.me?subject=Reaching%20Out%20Re%3A&body=).
 
 I can also be found on [LinkedIn](https://www.linkedin.com/in/melalawi) and [Github](https://github.com/melalawi).
 
