@@ -1,7 +1,7 @@
 ---
 title: Reach Out to Me
 description: Feel free to drop a word.
-featured_image: /images/sidebar/7.jpg
+featured_image: /images/sidebar/6.jpg
 ---
 
 I can be reached via my email at [mo@itsmo.me](mailto:mo@itsmo.me?subject=Reaching%20Out%20Re%3A&body=).
