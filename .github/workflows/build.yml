@@ -29,3 +29,5 @@ jobs:
         run: bundle exec jekyll build
         env:
           JEKYLL_ENV: production
+
+# Build check verification.
