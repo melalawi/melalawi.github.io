@@ -33,3 +33,5 @@ jobs:
           # production build unless it can name the repository it belongs to.
           PAGES_REPO_NWO: ${{ github.repository }}
           JEKYLL_GITHUB_TOKEN: ${{ github.token }}
+
+# Build check verification.
