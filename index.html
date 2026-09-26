@@ -1,0 +1,42 @@
+---
+layout: default
+title: Software Developer @ AWS Vancouver
+description: Mo Alawi
+featured_image: /images/sidebar/1.jpg
+---
+<section class="intro">
+
+	<div class="wrap">
+
+		<h1>Hey, It's Mo</h1>
+		<p>Software Developer @ AWS Vancouver</p>
+
+	</div>
+
+</section>
+
+<section class="single">
+
+	<div class="wrap">
+		{% assign min = 1 %}
+		{% assign max = 3 %}
+		{% assign diff = max | minus: min %}
+		{% assign randomNumber = site.time | date: "%s" | modulo: diff | plus: min %}
+
+		<div class="image-wrap"><img id="splash-image" src="{{'images/splash/' | append: randomNumber | append: '.jpg'}}" alt="Mo"></div>
+
+		<h2 id="features">What I Do</h2>
+		<ul>
+			<li>Backend Software Development</li>
+			<li>Distributed Computing</li>
+			<li>Development and Operations</li>
+			<li>Large-Scale Server Management</li>
+			<li>Fullstack Development</li>
+			<li>Intern & Engineer Mentorship</li>
+		</ul>
+
+		<p><a href="/resume" class="button button--large">Resume</a> <a href="/contact" class="button button--large">Reach Out!</a></p>
+
+	</div>
+
+</section>
