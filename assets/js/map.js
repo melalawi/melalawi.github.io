@@ -1,21 +1,124 @@
+// Cake unbake: the built page has no numbers. Each ROM section reads its repo's progress.json from main on every
+// visit, and fetches the memory map SVG and symbols.json only once its figure nears the screen. The last good copy
+// of each source is kept in this browser and drawn first, so a failed or malformed fetch keeps the last numbers
+// on screen; with no copy yet the section says the numbers are unavailable.
 // ROM memory map: hover or keyboard focus shows one function in the readout, lights the other functions of its
 // source file and marks its row and column. A click, tap or Enter opens a dialog with the same facts, steps to
-// the neighbouring functions and links its source on GitHub at the report's commit. A tap between slices or on a
-// row's offset picks the nearest slice in the nearest row, so the thinnest functions are reachable on a phone.
-// Strict mode keeps the block functions below out of the global scope (window.open stays the browser's).
-'use strict';
+// the neighbouring functions and links its source line on GitHub. A tap between slices or on a row's offset
+// picks the nearest slice in the nearest row, so the thinnest functions are reachable on a phone.
+import { figureInner, parseMap, parseProgress, sourceUrls, specHtml, versionTable } from './cake.js';
 
-const figures = [...document.querySelectorAll('.figure[data-map]')];
-const steppers = [];
+const steppers = new Map();
 const fnDialog = document.getElementById('fn');
 if (fnDialog) {
   fnDialog.addEventListener('click', (event) => {
     const button = event.target.closest('[data-step]');
-    if (button) for (const step of steppers) step(Number(button.dataset.step));
+    const step = button && steppers.get(fnDialog.dataset.map);
+    if (step) step(Number(button.dataset.step));
   });
 }
 
-for (const figure of figures) {
+const stored = (key) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const store = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage full or blocked: the live copy still shows, only the fallback is lost.
+  }
+};
+
+async function fetched(url) {
+  const response = await fetch(url, { cache: 'no-cache', signal: AbortSignal.timeout(15000) });
+  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+  return response.text();
+}
+
+// Draw the stored copy, then the live one; a live copy that draws is stored. Resolves to how it ended:
+// live, kept (stored copy on screen, live failed) or none (nothing to show).
+async function source(key, load, draw) {
+  let shown = false;
+  const old = stored(key);
+  if (old) {
+    try {
+      draw(old);
+      shown = true;
+    } catch {
+      // A stored copy this script can no longer read is ignored.
+    }
+  }
+  try {
+    const text = await load();
+    draw(text);
+    store(key, text);
+    return 'live';
+  } catch {
+    return shown ? 'kept' : 'none';
+  }
+}
+
+const unavailable = (box, repo) => {
+  box.innerHTML = `<p class="status">unavailable right now · <a href="https://github.com/${repo}">source</a></p>`;
+};
+
+async function numbers(section) {
+  const { repo, version } = section.dataset;
+  const versions = section.dataset.versions.split(' ');
+  const box = section.querySelector('.numbers');
+  const end = await source(`cake:${repo}:progress`, () => fetched(sourceUrls(repo, version).progress), (text) => {
+    const carts = parseProgress(JSON.parse(text), versions);
+    box.innerHTML = specHtml(carts[versions.indexOf(version)], versions, repo) + (versions.length > 1 ? versionTable(carts) : '');
+  });
+  if (end === 'none') unavailable(box, repo);
+  return end;
+}
+
+async function memoryMap(section) {
+  const { repo, version } = section.dataset;
+  const urls = sourceUrls(repo, version);
+  const figure = section.querySelector('.figure[data-map]');
+  const end = await source(
+    `cake:${repo}:${version}:map`,
+    async () => JSON.stringify(await Promise.all([fetched(urls.map), fetched(urls.symbols)])),
+    (text) => {
+      const [svg, symbols] = JSON.parse(text);
+      const inner = figureInner(parseMap(svg, JSON.parse(symbols)), repo);
+      if (fnDialog && fnDialog.open && fnDialog.dataset.map === section.dataset.key) return;
+      figure.innerHTML = inner;
+      bind(section);
+    },
+  );
+  if (end === 'none') unavailable(figure, repo);
+  return end;
+}
+
+const sections = [...document.querySelectorAll('section.rom[data-repo]')];
+const near = 'IntersectionObserver' in window
+  ? (el, run) => {
+      const watcher = new IntersectionObserver((entries) => {
+        if (entries.some((x) => x.isIntersecting)) {
+          watcher.disconnect();
+          run();
+        }
+      }, { rootMargin: '300px 0px' });
+      watcher.observe(el);
+    }
+  : (el, run) => run();
+// Maps are watched once every section has its numbers, so the layout above each figure is settled.
+sections.forEach((section, i) => (section.dataset.key = String(i)));
+Promise.all(sections.map(numbers)).then((ends) =>
+  sections.forEach((section, i) =>
+    near(section.querySelector('.figure[data-map]'), () => memoryMap(section).then((map) => (section.dataset.live = `${ends[i]} ${map}`))),
+  ),
+);
+
+function bind(section) {
+  const figure = section.querySelector('.figure[data-map]');
   const data = JSON.parse(figure.querySelector('.map-data').textContent);
   const map = figure.querySelector('.map');
   const readout = figure.querySelector('.readout');
@@ -32,8 +135,8 @@ for (const figure of figures) {
   }
   data.fns.forEach((fn, f) => fn[1] >= 0 && push(byUnit, fn[1], f));
 
-  const hex = (value) => `0x${value.toString(16).toUpperCase().padStart(8, '0')}`;
-  const source = (f) => (data.fns[f][1] < 0 ? null : `https://github.com/${data.repo}/blob/${data.ref}/${data.units[data.fns[f][1]]}`);
+  const hex = (value) => `0x${value.toString(16).toUpperCase().padStart(6, '0')}`;
+  const source = (f) => (data.fns[f][1] < 0 ? null : `https://github.com/${data.repo}/blob/main/${data.units[data.fns[f][1]]}#L${data.fns[f][5]}`);
   let lit = [];
   let current = -1;
   let slice = null;
@@ -85,7 +188,7 @@ for (const figure of figures) {
       ['file', fn[1] >= 0 ? data.units[fn[1]] : 'asm'],
       ['match', `${fn[2]} %`],
       ['size', `${fn[3]} B`],
-      ['address', hex(fn[4])],
+      ['rom offset', hex(fn[4])],
     ];
   }
 
@@ -93,7 +196,7 @@ for (const figure of figures) {
   function detail(f) {
     if (!dialog || f < 0) return;
     picked = f;
-    dialog.dataset.map = figures.indexOf(figure);
+    dialog.dataset.map = section.dataset.key;
     dialog.querySelector('h2').textContent = data.fns[f][0];
     const list = dialog.querySelector('dl');
     list.replaceChildren(
@@ -115,8 +218,7 @@ for (const figure of figures) {
     dialog.querySelector('[data-step="1"]').disabled = f === data.fns.length - 1;
     if (!dialog.open) dialog.showModal();
   }
-  steppers.push((step) => {
-    if (dialog.dataset.map !== String(figures.indexOf(figure))) return;
+  steppers.set(section.dataset.key, (step) => {
     const f = Math.min(data.fns.length - 1, Math.max(0, picked + step));
     move(f);
     detail(f);

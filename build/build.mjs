@@ -1,12 +1,10 @@
-// npm run build: markdown and the public ROM reports to static HTML in dist/.
+// npm run build: markdown to static HTML in dist/. Cake unbake numbers are not built in: the page reads them live.
 import { mkdir, readFile, readdir, rm, writeFile, copyFile } from 'node:fs/promises';
 import { basename, dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { marked } from 'marked';
 import { groupByYear, parsePost, sortPosts, splitFrontMatter, tagIndex, tagSlug } from './blog.mjs';
-import { anchorHeadings, CLOSE, escapeHtml, heading, layout, legend, memoryMap, postList, resumeUrl, slugify, tagLinks, versionTable } from './html.mjs';
-import { bucket, compareCounts, measuresCounts, parseReport, readmeCounts } from './report.mjs';
-import { mapRows, parseCartridges, regionCode, romLayout } from './rom.mjs';
+import { anchorHeadings, CLOSE, escapeHtml, heading, layout, postList, resumeUrl, slugify, tagLinks } from './html.mjs';
 import { rss } from './rss.mjs';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,70 +22,6 @@ async function walk(dir) {
     entries.map((entry) => (entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)])),
   );
   return files.flat();
-}
-
-function rawUrl(game, path, ref = game.branch) {
-  return `https://raw.githubusercontent.com/${game.repo}/${ref}/${path}`;
-}
-
-export function reportUrl(game, version, ref = game.branch) {
-  return rawUrl(game, `versions/${version}/report.json`, ref);
-}
-
-export function headUrl(game) {
-  return `https://api.github.com/repos/${game.repo}/commits/${game.branch}`;
-}
-
-async function get(fetchImpl, url, headers = {}) {
-  const response = await fetchImpl(url, { headers, signal: AbortSignal.timeout(60000) });
-  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
-  return response;
-}
-
-// Each repo's branch head commit, then every report, README and config.toml at that commit. Any failed fetch stops the build.
-export async function fetchSources(site, fetchImpl = fetch, token = process.env.GITHUB_TOKEN) {
-  const headers = { accept: 'application/vnd.github.sha', ...(token ? { authorization: `Bearer ${token}` } : {}) };
-  const commits = new Map(
-    await Promise.all(site.games.map(async (game) => [game.id, (await (await get(fetchImpl, headUrl(game), headers)).text()).trim()])),
-  );
-  const reportJobs = site.games.flatMap((game) =>
-    game.versions.map(async (version) => {
-      const response = await get(fetchImpl, reportUrl(game, version, commits.get(game.id)));
-      return [`${game.id}/${version}`, parseReport(await response.json())];
-    }),
-  );
-  const text = (path) =>
-    site.games.map(async (game) => [game.id, await (await get(fetchImpl, rawUrl(game, path, commits.get(game.id)))).text()]);
-  const [reports, readmes, configs] = await Promise.all([
-    Promise.all(reportJobs),
-    Promise.all(text('README.md')),
-    Promise.all(text('config.toml')),
-  ]);
-  return { commits, reports: new Map(reports), readmes: new Map(readmes), configs: new Map(configs) };
-}
-
-// Computed totals must equal objdiff's own measures and the README code and functions rows.
-export function verify(site, { reports, readmes }) {
-  const problems = [];
-  for (const game of site.games) {
-    let readme = new Map();
-    try {
-      readme = readmeCounts(readmes.get(game.id));
-    } catch (error) {
-      problems.push(`${game.repo} README: ${error.message}`);
-    }
-    for (const version of game.versions) {
-      const label = `${game.repo} ${version}`;
-      const parsed = reports.get(`${game.id}/${version}`);
-      problems.push(...compareCounts(`${label} report.json measures`, parsed.totals, measuresCounts(parsed.measures)));
-      if (!readme.has(version)) {
-        problems.push(`${label}: README has no row for this version`);
-      } else {
-        problems.push(...compareCounts(`${label} README`, parsed.totals, readme.get(version)));
-      }
-    }
-  }
-  return problems;
 }
 
 async function loadContent(root) {
@@ -129,53 +63,13 @@ function contactForm(contact) {
 </form>`;
 }
 
-const BYTES_PER_ROW = 16384;
-const n = (value) => value.toLocaleString('en-US');
-
-// One ROM: spec rows from its default version, a line per version, and the memory map of the default version.
-function romSection(game, sources) {
-  const carts = parseCartridges(sources.configs.get(game.id));
-  const cart = (version) => {
-    if (!carts.has(version)) throw new Error(`${game.repo} config.toml has no version ${version}`);
-    return carts.get(version);
-  };
-  const main = cart(game.default);
-  const parsed = sources.reports.get(`${game.id}/${game.default}`);
-  const t = parsed.totals;
-  const rows = [
-    ['cartridge', main.id],
-    ['region', regionCode(game.default)],
-    ['revision', String(main.revision)],
-    ['versions', game.versions.join(', ')],
-    ['matched fn', `${n(t.exact)} / ${n(t.functions)}`],
-    ['% .text', `${t.exactPercent.toFixed(2)} %`],
-    ['matched bytes', `${n(t.exactBytes)} / ${n(t.bytes)} B`],
-    ['fuzzy fn', n(t.fuzzy)],
-    ['asm fn', n(t.none)],
-  ];
-  const spec = `<dl class="spec">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${escapeHtml(v)}</dd></div>`).join('')}<div><a href="https://github.com/${escapeHtml(game.repo)}">source</a></div></dl>`;
-  const versions = game.versions.length > 1
-    ? versionTable(game.versions.map((v) => ({ version: v, cart: cart(v), totals: sources.reports.get(`${game.id}/${v}`).totals })))
-    : '';
-  const segments = romLayout(parsed.modules);
-  const fns = segments.flatMap((segment) => segment.fns);
-  const map = memoryMap(mapRows(segments, BYTES_PER_ROW), bucket, new Map(fns.map((fn, i) => [fn, i])));
-  const units = [...new Set(fns.map((fn) => fn.unit).filter(Boolean))];
-  const unitIndex = new Map(units.map((unit, i) => [unit, i]));
-  const data = {
-    repo: game.repo,
-    ref: sources.commits.get(game.id),
-    units,
-    fns: fns.map((fn) => [fn.name, fn.unit ? unitIndex.get(fn.unit) : -1, Math.round(fn.percent), fn.size, fn.address]),
-  };
-  return `<section class="rom">
-<h2 id="${slugify(main.id)}"><a href="${escapeHtml(game.wiki)}">${escapeHtml(main.id)}</a></h2>
-${spec}
-${versions}
-<figure class="figure" data-map>
-<p class="readout" hidden></p>
-<script type="application/json" class="map-data">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>
-${map}${legend()}</figure>
+// One ROM: its heading and an empty frame. The page script fills the numbers from the repo's progress.json and,
+// once the figure nears the screen, the memory map from its published SVG and symbols.json.
+function romSection(game) {
+  return `<section class="rom" data-repo="${escapeHtml(game.repo)}" data-version="${escapeHtml(game.default)}" data-versions="${escapeHtml(game.versions.join(' '))}">
+<h2 id="${slugify(game.cart)}"><a href="${escapeHtml(game.wiki)}">${escapeHtml(game.cart)}</a></h2>
+<div class="numbers"><p class="status">loading…</p></div>
+<figure class="figure" data-map><p class="status">loading…</p></figure>
 </section>`;
 }
 
@@ -202,7 +96,7 @@ function siteIndex({ site, posts }) {
 }
 
 // Every output file as a path to content map. Pure apart from markdown rendering.
-export function renderSite(content, sources) {
+export function renderSite(content) {
   const { site, pages, archive, posts } = content;
   const index = siteIndex(content);
   const out = new Map();
@@ -215,13 +109,13 @@ export function renderSite(content, sources) {
     'attic/cake-unbake/index.html',
     page('/attic/cake-unbake/', cake.data.title, `<p class="back"><a href="/attic/">attic</a></p>
 ${heading(cake.data.title, cake.data.subtitle)}
-${site.games.map((game) => romSection(game, sources)).join('\n')}
+${site.games.map(romSection).join('\n')}
 <dialog class="modal" id="fn" aria-labelledby="fn-title">
 <div class="modal-head"><h2 id="fn-title"></h2>${CLOSE}</div>
 <dl class="spec"></dl>
 <p class="modal-actions"><button type="button" class="step" data-step="-1" aria-label="previous function">‹ prev</button><button type="button" class="step" data-step="1" aria-label="next function">next ›</button><a class="fn-source" target="_blank" rel="noopener">source</a></p>
 </dialog>
-<script defer src="/js/map.js"></script>`),
+<script type="module" src="/js/map.js"></script>`),
   );
   out.set(
     'attic/index.html',
@@ -301,29 +195,18 @@ async function writeSite(root, outDir, files) {
   ]);
 }
 
-// Render and write dist/ from already fetched sources.
-export async function build({ root = ROOT, outDir = join(root, 'dist'), sources }) {
+// Render and write dist/.
+export async function build({ root = ROOT, outDir = join(root, 'dist') } = {}) {
   const started = performance.now();
   const content = await loadContent(root);
-  const files = renderSite(content, sources);
+  const files = renderSite(content);
   await writeSite(root, outDir, files);
   process.stderr.write(`built ${files.size} files in ${(performance.now() - started).toFixed(0)} ms\n`);
   return content;
 }
 
-// npm run build: fetch, verify, then write. A failed check writes nothing.
-async function main() {
-  const started = performance.now();
-  const site = JSON.parse(await readFile(join(ROOT, 'site.json'), 'utf8'));
-  const sources = await fetchSources(site);
-  process.stderr.write(`fetched sources in ${(performance.now() - started).toFixed(0)} ms\n`);
-  const problems = verify(site, sources);
-  if (problems.length) throw new Error(`totals check failed:\n${problems.join('\n')}`);
-  await build({ sources });
-}
-
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => {
+  build().catch((error) => {
     process.stderr.write(`${error.message}\n`);
     process.exit(1);
   });

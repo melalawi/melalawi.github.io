@@ -26,9 +26,9 @@
   "games": [
     {
       "id": "nrw",
+      "cart": "NUS-NRWE-1",
       "repo": "AbuN64/ragewars-decomp",
       "wiki": "https://en.wikipedia.org/wiki/Turok:_Rage_Wars",
-      "branch": "main",
       "versions": [
         "us-rev1",
         "us",
@@ -40,9 +40,9 @@
     },
     {
       "id": "nbx",
+      "cart": "NUS-NBXE-0",
       "repo": "AbuN64/battletanx-decomp",
       "wiki": "https://en.wikipedia.org/wiki/BattleTanx",
-      "branch": "main",
       "versions": [
         "us"
       ],

@@ -25,8 +25,8 @@ The build writes `dist/`. The dev server binds every interface on port 4380 or t
 
 ## cake unbake
 
-The attic page cake unbake reads each ROM's public `report.json`, `config.toml` and README at build time. It recalculates the totals and the build fails when they disagree with the report's own measures or the README progress rows. The memory map is plain HTML. The only script is the light, dark or system theme switch, and the site works without it.
+The attic page cake unbake holds no numbers. In the browser each ROM section reads its repo's `progress.json` from main, and once the figure nears the screen it reads the memory map SVG and `symbols.json` for the source links. The last good copy of each file stays in the browser and shows when a fetch fails.
 
 ## Deploy
 
-A push to `main` runs one GitHub Actions workflow that tests, builds and publishes to Pages. It also runs daily so the ROM totals stay fresh.
+A push to `main` runs one GitHub Actions workflow that tests, builds and publishes to Pages.

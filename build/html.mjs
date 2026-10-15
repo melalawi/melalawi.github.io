@@ -11,8 +11,6 @@ export function escapeHtml(value) {
 }
 
 const e = escapeHtml;
-const pct = (value) => `${value.toFixed(2)}%`;
-const count = (value) => value.toLocaleString('en-US');
 
 export function slugify(text) {
   return String(text)
@@ -130,56 +128,4 @@ export function postList(posts, tagSlug, empty = 'no posts yet.') {
       (post) => `<li><time datetime="${post.date}">${post.date}</time><span><a href="${post.url}">${e(post.title)}</a><span class="sub">${e(post.summary)}</span>${tagLinks(post.tags, tagSlug)}</span></li>`,
     )
     .join('\n')}</ul>`;
-}
-
-const hex = (value, digits = 6) => `0x${value.toString(16).toUpperCase().padStart(digits, '0')}`;
-const share = (fraction) => `${(fraction * 100).toFixed(3).replace(/\.?0+$/, '')}%`;
-
-// Colour steps of the map: asm, the fuzzy gradient, exact.
-export function legend() {
-  const steps = Array.from({ length: 11 }, (_, i) => `<i class="q${i}"></i>`).join('');
-  return `<p class="legend"><span>asm</span><span class="steps">${steps}</span><span>exact</span></p>`;
-}
-
-// ROM memory map: one row per fixed byte span, each function a slice as wide as its bytes.
-// Slices name their function's index in the page data. Slices wide enough to see get an edge against their neighbour.
-const SEPARATED = 0.006;
-export function memoryMap(rows, bucket, index) {
-  const lines = rows
-    .map((row) => {
-      const label = row.segment
-        ? `<div class="seg">${hex(row.segment.start)}–${hex(row.segment.end)} · ${count(row.segment.fns.length)} fn</div>`
-        : '';
-      const edge = row.boundary ? `<b class="edge" style="left:${share(row.boundary)}"></b>` : '';
-      const slices = row.slices
-        .map(({ fn, left, width }) => {
-          const cls = `q${bucket(fn.percent, fn.exact)}${width >= SEPARATED ? ' s' : ''}`;
-          return `<i class="${cls}" data-f="${index.get(fn)}" style="left:${share(left)};width:${share(width)}"></i>`;
-        })
-        .join('');
-      return `${label}<div class="row"><span class="off">${hex(row.offset)}</span><span class="track">${edge}${slices}</span></div>`;
-    })
-    .join('\n');
-  return `<div class="map" aria-label="memory map: arrow keys move between functions, enter or a tap opens its details">${lines}<b class="cross" hidden></b></div>`;
-}
-
-// One line per ROM version: version code, cartridge (its code carries region and revision) and the recomputed counts.
-// data-label is the short label a narrow column shows beside each value once the header row is hidden.
-export function versionTable(rows) {
-  const cell = (label, value) => `<td data-label="${label}">${value}</td>`;
-  const body = rows
-    .map(({ version, cart, totals }) => `<tr><td>${e(version)}</td><td>${e(cart.id)}</td>${[
-      cell('fn', `${count(totals.exact)}/${count(totals.functions)}`),
-      cell('.text', pct(totals.exactPercent)),
-      cell('B', `${count(totals.exactBytes)}/${count(totals.bytes)}`),
-      cell('fuzzy', count(totals.fuzzy)),
-      cell('asm', count(totals.none)),
-    ].join('')}</tr>`)
-    .join('\n');
-  return `<div class="versions"><table class="table">
-<thead><tr><th>version</th><th>cartridge</th><th>matched fn</th><th>% .text</th><th>matched B</th><th>fuzzy</th><th>asm</th></tr></thead>
-<tbody>
-${body}
-</tbody>
-</table></div>`;
 }

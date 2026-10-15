@@ -1,12 +1,11 @@
 // npm run dev: build once, serve dist/ on every interface, rebuild when content changes.
-// Reports are fetched once per server start. Set PORT and HOST to override.
+// Set PORT and HOST to override.
 import { createServer } from 'node:http';
 import { watch } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { networkInterfaces } from 'node:os';
-import { readFileSync } from 'node:fs';
-import { ROOT, build, fetchSources, verify } from './build.mjs';
+import { ROOT, build } from './build.mjs';
 
 const DIST = join(ROOT, 'dist');
 const HOST = process.env.HOST || '0.0.0.0';
@@ -14,6 +13,8 @@ const FIRST_PORT = Number(process.env.PORT || 4380);
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json',
   '.xml': 'application/rss+xml; charset=utf-8',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
@@ -53,13 +54,7 @@ function listen(server, port) {
   });
 }
 
-const site = JSON.parse(readFileSync(join(ROOT, 'site.json'), 'utf8'));
-const sources = await fetchSources(site);
-await build({ sources });
-const problems = verify(site, sources);
-process.stderr.write(
-  problems.length ? `npm run build would fail the totals check:\n${problems.join('\n')}\n` : 'totals check passed\n',
-);
+await build();
 const port = await listen(createServer(handle), FIRST_PORT);
 const addresses = Object.values(networkInterfaces())
   .flat()
@@ -73,7 +68,7 @@ for (const dir of ['content', 'posts', 'assets', 'site.json']) {
     watch(join(ROOT, dir), { recursive: true }, () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        build({ sources }).catch((error) => process.stderr.write(`rebuild failed: ${error.message}\n`));
+        build().catch((error) => process.stderr.write(`rebuild failed: ${error.message}\n`));
       }, 100);
     });
   } catch (error) {
