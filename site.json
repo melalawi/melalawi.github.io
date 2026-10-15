@@ -1,0 +1,56 @@
+{
+  "title": "mo",
+  "handle": "mo",
+  "url": "https://itsmo.me",
+  "tagline": "software developer @ AWS Vancouver",
+  "links": [
+    {
+      "label": "email",
+      "href": "mailto:mo@itsmo.me"
+    },
+    {
+      "label": "github",
+      "href": "https://github.com/melalawi"
+    },
+    {
+      "label": "linkedin",
+      "href": "https://www.linkedin.com/in/melalawi"
+    }
+  ],
+  "contact": {
+    "action": "https://formspree.io/mpzlkyzz",
+    "next": "/thanks",
+    "subject": "Personal Site Contact Form Submission",
+    "button": "send message"
+  },
+  "games": [
+    {
+      "id": "nrw",
+      "repo": "AbuN64/ragewars-decomp",
+      "wiki": "https://en.wikipedia.org/wiki/Turok:_Rage_Wars",
+      "branch": "main",
+      "versions": [
+        "us-rev1",
+        "us",
+        "eu",
+        "eu-x",
+        "de"
+      ],
+      "default": "us-rev1"
+    },
+    {
+      "id": "nbx",
+      "repo": "AbuN64/battletanx-decomp",
+      "wiki": "https://en.wikipedia.org/wiki/BattleTanx",
+      "branch": "main",
+      "versions": [
+        "us"
+      ],
+      "default": "us"
+    }
+  ],
+  "resume": {
+    "drive": "1L1TUCZBAtHqIHeMF9thk8V1ES6_N6MaT",
+    "updated": "2021-09-08"
+  }
+}

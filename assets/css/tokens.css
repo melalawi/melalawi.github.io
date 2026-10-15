@@ -1,0 +1,60 @@
+/* L1 design tokens for the Index design. Names follow AtomUI so its release theme can replace this file.
+   Type is the reader's own book serif, everywhere: no web fonts are loaded.
+   Colours are light-dark() pairs: the system preference picks one unless data-theme pins it. */
+:root {
+  color-scheme: light dark;
+  --color-chassis: light-dark(#fbfaf6, #191814);
+  --color-inset: light-dark(#f2f0e8, #24231e);
+  --color-panel: light-dark(#fbfaf6, #191814);
+  --color-edge: light-dark(#dcd8cc, #3a3831);
+  --color-edge-strong: light-dark(#bdb8aa, #56534a);
+  --color-text: light-dark(#1b1a17, #ebe7dc);
+  --color-text-muted: light-dark(#6d6a62, #a8a397);
+  --color-accent: light-dark(#7b7fd9, #9a9df0);
+  --color-accent-press: light-dark(#5c60c4, #b9bbf6);
+  --color-on-accent: light-dark(#fbfaf6, #191814);
+
+  --heat-0: light-dark(#d9d4c7, #4a463d);
+  --heat-1: light-dark(#e3e2f2, #35375a);
+  --heat-2: light-dark(#d6d6ef, #3c3f66);
+  --heat-3: light-dark(#c8c9ec, #444772);
+  --heat-4: light-dark(#babce8, #4d517f);
+  --heat-5: light-dark(#acafe4, #575b8c);
+  --heat-6: light-dark(#9ea2df, #62669a);
+  --heat-7: light-dark(#9094d8, #6e72a8);
+  --heat-8: light-dark(#8186cf, #7b7fb6);
+  --heat-9: light-dark(#7277c4, #888cc4);
+  --heat-10: light-dark(#1b1a17, #d6d0bd);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2.5rem;
+  --space-6: 4rem;
+
+  --font-family-text: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Charter, 'Bitstream Charter', Georgia, serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-size-xs: 0.78rem;
+  --font-size-sm: 0.88rem;
+  --font-size-md: clamp(15px, 14px + 0.15vw, 16.5px);
+  --font-size-lg: 1.15rem;
+  --font-size-xl: 1.45rem;
+  --font-size-3xl: clamp(2.2rem, 1.6rem + 2.5vw, 3.4rem);
+  --line-height-prose: 1.6;
+  --line-height-tight: 1.15;
+  --tracking-label: 0.2em;
+  --radius: 0;
+
+  --measure: 40rem;
+  --index-width: 19rem;
+  --map-row: 9px;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
