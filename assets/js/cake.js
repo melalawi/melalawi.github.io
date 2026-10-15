@@ -2,12 +2,16 @@
 // visit. Pure: no DOM, no fetch, so the tests run it in node.
 //   progress.json                {schema:1, carts:[{id, version, functions:{matched,total}, text_pct, bytes:{matched,fuzzy,asm,total}}]}
 //   docs/memory-map-<v>.svg      one <g> per 16 KiB ROM row; each <rect class="qN"> a function slice titled "name · P% · S B"
-//   versions/<v>/symbols.json    {schema:1, functions:{name:{path, line, summary?}}}; asm-only functions are absent.
-//                                summary: one plain sentence on what the function does; absent until written.
+//   versions/<v>/symbols.json    {schema:2, functions:{name:{path, line, percent, words:[matched,total], summary?}}}; asm-only
+//                                functions are absent. percent: fuzzy percent 0..100. summary: one plain sentence on what the
+//                                function does; absent until written. Schema 1 (no percent, words) is read until the repos
+//                                publish schema 2, taking the percent from the map slice title; drop that path one release after.
 //   <path>                       the C file at main; a function's source is its text from `line` to its closing brace
 
 export const BYTES_PER_ROW = 16384;
 const SEPARATED = 0.006;
+const HUE_RED = 25;
+const HUE_SPAN = 125;
 
 export function rawUrl(repo, path) {
   return `https://raw.githubusercontent.com/${repo}/main/${path}`;
@@ -121,16 +125,15 @@ const unescape = (text) => text.replace(/&(amp|lt|gt|quot|apos);/g, (all, name) 
 export function parseMap(svg, symbols) {
   const view = /viewBox="0 0 ([\d.]+) [\d.]+"/.exec(svg);
   if (!view) throw new TypeError('memory map has no viewBox');
-  if (!symbols || symbols.schema !== 1 || typeof symbols.functions !== 'object') throw new TypeError('symbols.json is not schema 1');
+  if (!symbols || ![1, 2].includes(symbols.schema) || typeof symbols.functions !== 'object') throw new TypeError('symbols.json is not schema 1 or 2');
   const groups = [...svg.matchAll(/<g transform="translate\(0 [\d.]+\)"><text[^>]*>([0-9A-Fa-f]+)<\/text>([\s\S]*?)<\/g>/g)];
   if (!groups.length) throw new TypeError('memory map has no rows');
   const parsed = groups.map(([, offset, body]) => ({
     offset: parseInt(offset, 16),
-    rects: [...body.matchAll(/<rect class="(q\d+)" x="([\d.]+)" width="([\d.]+)"[^>]*><title>([^<]*)<\/title><\/rect>/g)].map((m) => ({
-      q: Number(m[1].slice(1)),
-      x: Number(m[2]),
-      w: Number(m[3]),
-      title: unescape(m[4]),
+    rects: [...body.matchAll(/<rect class="q\d+" x="([\d.]+)" width="([\d.]+)"[^>]*><title>([^<]*)<\/title><\/rect>/g)].map((m) => ({
+      x: Number(m[1]),
+      w: Number(m[2]),
+      title: unescape(m[3]),
     })),
     marks: [...body.matchAll(/<rect class="h" x="([\d.]+)"/g)].map((m) => Number(m[1])),
   }));
@@ -155,13 +158,13 @@ export function parseMap(svg, symbols) {
       // A slice continues the previous function when it has the same name and starts where that slice ended.
       if (!last || last.name !== t[1] || Math.abs(from - end) > 16) {
         const symbol = Object.prototype.hasOwnProperty.call(symbols.functions, t[1]) ? symbols.functions[t[1]] : null;
-        last = { name: t[1], percent: Number(t[2]), size: Number(t[3]), rom: from, q: r.q, path: symbol ? symbol.path : null, line: symbol ? symbol.line : null, row: rows.length };
+        last = { name: t[1], percent: symbol && typeof symbol.percent === 'number' ? symbol.percent : Number(t[2]), size: Number(t[3]), rom: from, path: symbol ? symbol.path : null, line: symbol ? symbol.line : null, words: symbol && symbol.words ? symbol.words : null, row: rows.length };
         fns.push(last);
         f = fns.length - 1;
       }
       fns[f].lastRow = rows.length;
       end = from + Math.round((r.w / width) * BYTES_PER_ROW);
-      slices.push({ f, q: r.q, left: (r.x - left) / width, width: r.w / width });
+      slices.push({ f, left: (r.x - left) / width, width: r.w / width });
     }
     rows.push({ offset: row.offset, slices, edges: [] });
   }
@@ -187,19 +190,23 @@ export function parseMap(svg, symbols) {
   return { fns, rows };
 }
 
-export function legend() {
-  const steps = Array.from({ length: 11 }, (_, i) => `<i class="q${i}"></i>`).join('');
-  return `<p class="legend"><span>asm</span><span class="steps">${steps}</span><span>exact</span></p>`;
+// Hue of a function's color: its fuzzy percent mapped from red (0) to green (100).
+export function hue(percent) {
+  return Math.round(HUE_RED + (Math.min(100, Math.max(0, percent)) / 100) * HUE_SPAN);
 }
 
-// ROM memory map: one row per 16 KiB, each function a slice as wide as its bytes, naming its function's index.
-export function mapHtml({ rows }) {
+export function legend() {
+  return '<p class="legend"><span>0 %</span><span class="ramp"></span><span>100 %</span></p>';
+}
+
+// ROM memory map: one row per 16 KiB, each function a slice as wide as its bytes, colored by its fuzzy percent.
+export function mapHtml({ rows, fns }) {
   const lines = rows
     .map((row) => {
       const label = row.segment ? `<div class="seg">${hex(row.segment.start)}–${hex(row.segment.end)} · ${n(row.segment.count)} fn</div>` : '';
       const edges = row.edges.map((at) => `<b class="edge" style="left:${share(at)}"></b>`).join('');
       const slices = row.slices
-        .map(({ f, q, left, width }) => `<i class="q${q}${width >= SEPARATED ? ' s' : ''}" data-f="${f}" style="left:${share(left)};width:${share(width)}"></i>`)
+        .map(({ f, left, width }) => `<i${width >= SEPARATED ? ' class="s"' : ''} data-f="${f}" style="left:${share(left)};width:${share(width)};--h:${hue(fns[f].percent)}"></i>`)
         .join('');
       return `${label}<div class="row"><span class="off">${hex(row.offset)}</span><span class="track">${edges}${slices}</span></div>`;
     })
@@ -207,14 +214,14 @@ export function mapHtml({ rows }) {
   return `<div class="map" aria-label="memory map: arrow keys move between functions, enter or a tap opens its details">${lines}<b class="cross" hidden></b></div>`;
 }
 
-// The compact per-function data the map script reads: [name, file index or -1, percent, size, ROM offset, line].
+// The compact per-function data the map script reads: [name, file index or -1, percent, size, ROM offset, line, words or null].
 export function mapData(model, repo) {
   const units = [...new Set(model.fns.map((fn) => fn.path).filter(Boolean))];
   const index = new Map(units.map((unit, i) => [unit, i]));
   return {
     repo,
     units,
-    fns: model.fns.map((fn) => [fn.name, fn.path ? index.get(fn.path) : -1, fn.percent, fn.size, fn.rom, fn.line || 0]),
+    fns: model.fns.map((fn) => [fn.name, fn.path ? index.get(fn.path) : -1, fn.percent, fn.size, fn.rom, fn.line || 0, fn.words]),
   };
 }
 

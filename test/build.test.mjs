@@ -6,7 +6,7 @@ import { ROOT, renderSite } from '../build/build.mjs';
 import { parsePost } from '../build/blog.mjs';
 import { anchorHeadings, bookIndex } from '../build/html.mjs';
 
-const games = [{ id: 'one', cart: 'NUS-NXXE-1', repo: 'Org/game-one', wiki: 'https://wiki.test/Game_One', versions: ['us', 'eu'], default: 'us' }];
+const games = [{ id: 'one', repo: 'Org/game-one', wiki: 'https://wiki.test/Game_One', versions: ['us', 'eu'], default: 'us' }];
 const site = {
   title: 'site', handle: 'me', url: 'https://example.test', tagline: 't', links: [], games,
   contact: { action: 'https://forms.example/x', next: '/thanks', subject: 'Hi', button: 'send' },
@@ -21,7 +21,7 @@ const render = () => {
   const archive = [{ slug: 'ext', data: { title: 'Ext', subtitle: 'a browser extension', years: '2015', icon: '/i.png', links: [{ label: 'source', href: 'https://example.test/ext' }] }, body: '' }];
   const cake = { data: { title: 'cake unbake' }, body: '' };
   const pages = { home: page(), contact: page(), 404: page(), 'cake-unbake': cake };
-  return renderSite({ site, pages, archive, posts });
+  return renderSite({ site, pages, archive, posts, cartridges: { one: 'NUS-NXXE-1' } });
 };
 
 test('renderSite writes every page, tag page and the feed, and no old routes', () => {

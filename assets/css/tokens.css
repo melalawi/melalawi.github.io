@@ -14,17 +14,6 @@
   --color-accent-press: light-dark(#5c60c4, #b9bbf6);
   --color-on-accent: light-dark(#fbfaf6, #191814);
 
-  --heat-0: light-dark(#d9d4c7, #4a463d);
-  --heat-1: light-dark(#e3e2f2, #35375a);
-  --heat-2: light-dark(#d6d6ef, #3c3f66);
-  --heat-3: light-dark(#c8c9ec, #444772);
-  --heat-4: light-dark(#babce8, #4d517f);
-  --heat-5: light-dark(#acafe4, #575b8c);
-  --heat-6: light-dark(#9ea2df, #62669a);
-  --heat-7: light-dark(#9094d8, #6e72a8);
-  --heat-8: light-dark(#8186cf, #7b7fb6);
-  --heat-9: light-dark(#7277c4, #888cc4);
-  --heat-10: light-dark(#1b1a17, #d6d0bd);
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -48,7 +37,6 @@
 
   --measure: 40rem;
   --index-width: 19rem;
-  --map-row: 9px;
 }
 
 :root[data-theme='light'] {

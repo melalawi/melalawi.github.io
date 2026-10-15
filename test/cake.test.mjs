@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detailHtml, figureInner, functionLines, highlightC, sourceUrl, mapData, mapHtml, parseMap, parseProgress, regionCode, sourceUrls, specRows, versionTable } from '../assets/js/cake.js';
+import { hue, detailHtml, figureInner, functionLines, highlightC, sourceUrl, mapData, mapHtml, parseMap, parseProgress, regionCode, sourceUrls, specRows, versionTable } from '../assets/js/cake.js';
 import { progress, svg, symbols } from './fixtures.mjs';
 
 test('sourceUrls point at main of the repo for the default version', () => {
@@ -39,9 +39,9 @@ test('spec rows and the version table carry exactly the progress.json numbers', 
 test('parseMap reads functions in ROM order, joins a function split over rows and links symbols', () => {
   const model = parseMap(svg, symbols);
   assert.deepEqual(model.fns, [
-    { name: 'func_80000400', percent: 100, size: 256, rom: 0x1000, q: 10, path: 'src/a.c', line: 3 },
-    { name: 'step', percent: 87.5, size: 512, rom: 0x3f00, q: 8, path: 'src/a.c', line: 40 },
-    { name: 'func_80000900', percent: 0, size: 64, rom: 0xc040, q: 0, path: null, line: null },
+    { name: 'func_80000400', percent: 100, size: 256, rom: 0x1000, path: 'src/a.c', line: 3, words: null },
+    { name: 'step', percent: 87.5, size: 512, rom: 0x3f00, path: 'src/a.c', line: 40, words: null },
+    { name: 'func_80000900', percent: 0, size: 64, rom: 0xc040, path: null, line: null, words: null },
   ]);
   assert.deepEqual(model.rows.map((r) => [r.offset, r.slices.map((s) => s.f), r.edges, r.segment && [r.segment.start, r.segment.end, r.segment.count]]), [
     [0, [0, 1], [0.25], [0x1000, 0x4100, 2]],
@@ -53,20 +53,21 @@ test('parseMap reads functions in ROM order, joins a function split over rows an
 test('parseMap refuses malformed input instead of drawing a wrong map', () => {
   assert.throws(() => parseMap('<svg></svg>', symbols), /viewBox/);
   assert.throws(() => parseMap(svg, { functions: {} }), /symbols.json/);
+  assert.throws(() => parseMap(svg, { ...symbols, schema: 3 }), /schema 1 or 2/);
   assert.throws(() => parseMap(svg.replace('· 256 B', '256'), symbols), /is not "name/);
 });
 
 test('mapHtml draws slices, segment labels and edges; mapData indexes files and lines', () => {
   const model = parseMap(svg, symbols);
   const html = mapHtml(model);
-  assert.match(html, /<div class="seg">0x001000–0x004100 · 2 fn<\/div><div class="row"><span class="off">0x000000<\/span><span class="track"><b class="edge" style="left:25%"><\/b><i class="q10 s" data-f="0" style="left:25%;width:1.563%"><\/i>/);
-  assert.match(html, /<i class="q8 s" data-f="1" style="left:98.438%;width:1.563%"><\/i>/);
+  assert.match(html, /<div class="seg">0x001000–0x004100 · 2 fn<\/div><div class="row"><span class="off">0x000000<\/span><span class="track"><b class="edge" style="left:25%"><\/b><i class="s" data-f="0" style="left:25%;width:1.563%;--h:150"><\/i>/);
+  assert.match(html, /<i class="s" data-f="1" style="left:98.438%;width:1.563%;--h:134"><\/i>/);
   assert.match(html, /<div class="seg">0x00C040–0x00C080 · 1 fn<\/div>/);
-  assert.match(html, /<i class="q0" data-f="2" style="left:0.391%;width:0.391%"><\/i>/);
+  assert.match(html, /<i data-f="2" style="left:0.391%;width:0.391%;--h:25"><\/i>/);
   assert.deepEqual(mapData(model, 'Org/game-one'), {
     repo: 'Org/game-one',
     units: ['src/a.c'],
-    fns: [['func_80000400', 0, 100, 256, 0x1000, 3], ['step', 0, 87.5, 512, 0x3f00, 40], ['func_80000900', -1, 0, 64, 0xc040, 0]],
+    fns: [['func_80000400', 0, 100, 256, 0x1000, 3, null], ['step', 0, 87.5, 512, 0x3f00, 40, null], ['func_80000900', -1, 0, 64, 0xc040, 0, null]],
   });
   assert.match(figureInner(model, 'Org/game-one'), /^<p class="readout" hidden><\/p>\n<script type="application\/json" class="map-data">/);
 });
@@ -97,4 +98,13 @@ test('detailHtml shows the summary and the C, each only when present; sourceUrl 
   assert.equal(detailHtml({ summary: 'adds <1>' }), '<p class="fn-what">adds &lt;1&gt;</p>');
   assert.match(detailHtml({ code: 'return 1;' }), /^<section class="fn-c"><h3>c<\/h3><pre><span class="tk">return<\/span> <span class="tn">1<\/span>;<\/pre><\/section>$/);
   assert.equal(sourceUrl('Org/g', 'src/a.c', 3), 'https://github.com/Org/g/blob/main/src/a.c#L3');
+});
+
+test('schema 2 symbols give each function its percent and words; the gradient runs red to green', () => {
+  const two = { schema: 2, functions: { step: { path: 'src/a.c', line: 40, percent: 12.5, words: [10, 128] } } };
+  const model = parseMap(svg, two);
+  assert.deepEqual(model.fns.map((fn) => [fn.percent, fn.words]), [[100, null], [12.5, [10, 128]], [0, null]]);
+  assert.match(mapHtml(model), /data-f="1" style="left:98.438%;width:1.563%;--h:41"/);
+  assert.deepEqual([0, 50, 100, -5, 140].map(hue), [25, 88, 150, 25, 150]);
+  assert.deepEqual(mapData(model, 'Org/g').fns[1], ['step', 0, 12.5, 512, 0x3f00, 40, [10, 128]]);
 });

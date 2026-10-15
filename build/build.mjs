@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { marked } from 'marked';
 import { groupByYear, parsePost, sortPosts, splitFrontMatter, tagIndex, tagSlug } from './blog.mjs';
 import { anchorHeadings, CLOSE, escapeHtml, heading, layout, postList, resumeUrl, slugify, tagLinks } from './html.mjs';
+import { cartridgeId, fetchText } from './cartridges.mjs';
 import { rss } from './rss.mjs';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -24,8 +25,9 @@ async function walk(dir) {
   return files.flat();
 }
 
-async function loadContent(root) {
+async function loadContent(root, fetchSource) {
   const site = JSON.parse(await readFile(join(root, 'site.json'), 'utf8'));
+  const cartridges = Object.fromEntries(await Promise.all(site.games.map(async (game) => [game.id, await cartridgeId(game, fetchSource)])));
   const pages = {};
   for (const name of ['home', 'contact', '404', 'cake-unbake']) {
     pages[name] = splitFrontMatter(await readFile(join(root, 'content', `${name}.md`), 'utf8'));
@@ -43,7 +45,7 @@ async function loadContent(root) {
   const posts = await Promise.all(
     postFiles.map(async (file) => parsePost(relative(postsDir, file), await readFile(file, 'utf8'))),
   );
-  return { site, pages, archive, posts: sortPosts(posts) };
+  return { site, cartridges, pages, archive, posts: sortPosts(posts) };
 }
 
 function article(page, extra = '') {
@@ -63,11 +65,11 @@ function contactForm(contact) {
 </form>`;
 }
 
-// One ROM: its heading and an empty frame. The page script fills the numbers from the repo's progress.json and,
+// One ROM: its heading, named by the cartridge ID read from the repo, and an empty frame. The page script fills the numbers from the repo's progress.json and,
 // once the figure nears the screen, the memory map from its published SVG and symbols.json.
-function romSection(game) {
+function romSection(game, cart) {
   return `<section class="rom" data-repo="${escapeHtml(game.repo)}" data-version="${escapeHtml(game.default)}" data-versions="${escapeHtml(game.versions.join(' '))}">
-<h2 id="${slugify(game.cart)}"><a href="${escapeHtml(game.wiki)}">${escapeHtml(game.cart)}</a></h2>
+<h2 id="${slugify(cart)}"><a href="${escapeHtml(game.wiki)}">${escapeHtml(cart)}</a></h2>
 <div class="numbers"><p class="status">loading…</p></div>
 <figure class="figure" data-map><p class="status">loading…</p></figure>
 </section>`;
@@ -97,7 +99,7 @@ function siteIndex({ site, posts }) {
 
 // Every output file as a path to content map. Pure apart from markdown rendering.
 export function renderSite(content) {
-  const { site, pages, archive, posts } = content;
+  const { site, pages, archive, posts, cartridges } = content;
   const index = siteIndex(content);
   const out = new Map();
   const page = (path, title, body, extra = {}) => layout(site, { title, path, body, index, ...extra });
@@ -109,7 +111,7 @@ export function renderSite(content) {
     'attic/cake-unbake/index.html',
     page('/attic/cake-unbake/', cake.data.title, `<p class="back"><a href="/attic/">attic</a></p>
 ${heading(cake.data.title, cake.data.subtitle)}
-${site.games.map(romSection).join('\n')}
+${site.games.map((game) => romSection(game, cartridges[game.id])).join('\n')}
 <dialog class="modal" id="fn" aria-labelledby="fn-title">
 <div class="modal-head"><h2 id="fn-title"></h2>${CLOSE}</div>
 <dl class="spec"></dl>
@@ -197,9 +199,9 @@ async function writeSite(root, outDir, files) {
 }
 
 // Render and write dist/.
-export async function build({ root = ROOT, outDir = join(root, 'dist') } = {}) {
+export async function build({ root = ROOT, outDir = join(root, 'dist'), fetchSource = fetchText } = {}) {
   const started = performance.now();
-  const content = await loadContent(root);
+  const content = await loadContent(root, fetchSource);
   const files = renderSite(content);
   await writeSite(root, outDir, files);
   process.stderr.write(`built ${files.size} files in ${(performance.now() - started).toFixed(0)} ms\n`);

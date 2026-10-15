@@ -191,6 +191,7 @@ function bind(section, symbols) {
       ['match', `${fn[2]} %`],
       ['size', `${fn[3]} B`],
       ['rom offset', hex(fn[4])],
+      ...(fn[6] ? [['words', `${fn[6][0]} / ${fn[6][1]}`]] : []),
     ];
   }
 
