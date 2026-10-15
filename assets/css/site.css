@@ -517,22 +517,23 @@ a {
   height: 10px;
 }
 
-/* Version lines fit their column at every width: cells wrap, and a narrow column stacks each line as labelled pairs */
+/* Version lines: one compact unwrapped row each. A narrow column stacks each version into three short lines
+   (version and cartridge, then counts with short labels), so the table never scrolls sideways. */
 .versions {
   container-type: inline-size;
 }
 
 .versions .table th,
 .versions .table td {
-  padding: var(--space-2) var(--space-1);
-  white-space: normal;
+  padding: var(--space-1) var(--space-2);
 }
 
-.versions .table td:nth-child(-n + 2) {
-  white-space: nowrap;
+.versions .table th {
+  font-family: var(--font-family-text);
+  font-style: italic;
 }
 
-@container (max-width: 40rem) {
+@container (max-width: 34rem) {
   .versions thead {
     position: absolute;
     width: 1px;
@@ -543,36 +544,34 @@ a {
 
   .versions tr {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
-    gap: var(--space-1) var(--space-3);
-    padding: var(--space-3) 0;
+    grid-template-columns: repeat(3, auto);
+    grid-template-areas: 'v c c' 'f t z' 'b b a';
+    justify-content: space-between;
+    gap: 0 var(--space-3);
+    padding: var(--space-2) 0;
     border-bottom: 1px solid var(--color-edge);
   }
 
   .versions .table td {
-    display: flex;
-    flex-direction: column;
     padding: 0;
     text-align: left;
     border: 0;
   }
 
-  .versions .table td::before {
-    content: attr(data-label);
+  .versions td:nth-child(1) { grid-area: v; }
+  .versions td:nth-child(2) { grid-area: c; }
+  .versions td:nth-child(3) { grid-area: f; }
+  .versions td:nth-child(4) { grid-area: t; }
+  .versions td:nth-child(5) { grid-area: b; }
+  .versions td:nth-child(6) { grid-area: z; }
+  .versions td:nth-child(7) { grid-area: a; }
+
+  .versions td[data-label]::before {
+    content: attr(data-label) ' ';
     font-family: var(--font-family-text);
     font-style: italic;
     color: var(--color-text-muted);
   }
-}
-
-.table th:nth-child(3),
-.table td:nth-child(3) {
-  text-align: left;
-}
-
-.table th {
-  font-family: var(--font-family-text);
-  font-style: italic;
 }
 
 /* Archive */

@@ -114,7 +114,7 @@ test('cake unbake shows cartridge IDs linked to the game article, spec rows and 
   assert.match(html, /<div><a href="https:\/\/github.com\/Org\/game-one">source<\/a><\/div><\/dl>/);
   assert.ok(!/ · /.test(html.split('<dl class="spec">')[1].split('</dl>')[0]));
   assert.ok(!/<figcaption|class="sub"|class="prose"|North America|KiB per row/.test(html.split('<main')[1]));
-  assert.match(html, /<td data-label="version">eu<\/td><td data-label="cartridge">NUS-NXXP-0<\/td><td data-label="region">eu<\/td><td data-label="revision">0<\/td>/);
+  assert.match(html, /<tr><td>eu<\/td><td>NUS-NXXP-0<\/td><td data-label="fn">\d+\/2<\/td><td data-label=".text">[\d.]+%<\/td><td data-label="B">/);
   assert.ok(!html.includes('table-scroll'));
   assert.match(html, /class="q10 s" data-f="0" style="left:25%;width:0.61%"><\/i>/);
   assert.match(html, /class="q8 s" data-f="1" style="left:25.61%;width:1.221%"><\/i>/);

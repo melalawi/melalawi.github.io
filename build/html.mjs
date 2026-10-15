@@ -163,18 +163,21 @@ export function memoryMap(rows, bucket, index) {
   return `<div class="map" aria-label="memory map: arrow keys move between functions, enter or a tap opens its details">${lines}<b class="cross" hidden></b></div>`;
 }
 
-// One line per ROM version: version code, cartridge, region code, revision and the recomputed counts.
+// One line per ROM version: version code, cartridge (its code carries region and revision) and the recomputed counts.
+// data-label is the short label a narrow column shows beside each value once the header row is hidden.
 export function versionTable(rows) {
+  const cell = (label, value) => `<td data-label="${label}">${value}</td>`;
   const body = rows
-    .map(
-      ({ version, cart, totals }) => `<tr>
-<td data-label="version">${e(version)}</td><td data-label="cartridge">${e(cart.id)}</td><td data-label="region">${e(version.split('-')[0])}</td><td data-label="revision">${cart.revision}</td>
-<td data-label="matched fn">${count(totals.exact)} / ${count(totals.functions)}</td><td data-label="% .text">${pct(totals.exactPercent)}</td><td data-label="matched B">${count(totals.exactBytes)} / ${count(totals.bytes)}</td><td data-label="fuzzy fn">${count(totals.fuzzy)}</td><td data-label="asm fn">${count(totals.none)}</td>
-</tr>`,
-    )
+    .map(({ version, cart, totals }) => `<tr><td>${e(version)}</td><td>${e(cart.id)}</td>${[
+      cell('fn', `${count(totals.exact)}/${count(totals.functions)}`),
+      cell('.text', pct(totals.exactPercent)),
+      cell('B', `${count(totals.exactBytes)}/${count(totals.bytes)}`),
+      cell('fuzzy', count(totals.fuzzy)),
+      cell('asm', count(totals.none)),
+    ].join('')}</tr>`)
     .join('\n');
   return `<div class="versions"><table class="table">
-<thead><tr><th>version</th><th>cartridge</th><th>region</th><th>revision</th><th>matched fn</th><th>% .text</th><th>matched B</th><th>fuzzy fn</th><th>asm fn</th></tr></thead>
+<thead><tr><th>version</th><th>cartridge</th><th>matched fn</th><th>% .text</th><th>matched B</th><th>fuzzy</th><th>asm</th></tr></thead>
 <tbody>
 ${body}
 </tbody>
