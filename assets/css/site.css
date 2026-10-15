@@ -504,12 +504,28 @@ a {
   z-index: 2;
 }
 
-.track i {
-  background: light-dark(oklch(0.76 0.13 var(--h)), oklch(0.56 0.12 var(--h)));
+.track i.exact,
+.swatch.exact {
+  background: var(--heat-exact);
+}
+
+.track i.none,
+.swatch.none {
+  background: var(--heat-none);
+}
+
+.track i.fuzzy {
+  background: color-mix(in oklab, var(--heat-fuzzy-low), var(--heat-fuzzy-high) var(--p));
+}
+
+.swatch {
+  width: 0.8rem;
+  height: 0.6rem;
 }
 
 .legend {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   font-family: var(--font-family-mono);
@@ -518,9 +534,9 @@ a {
 }
 
 .ramp {
-  width: 8rem;
+  width: 6rem;
   height: 0.6rem;
-  background: linear-gradient(to right, light-dark(oklch(0.76 0.13 25), oklch(0.56 0.12 25)), light-dark(oklch(0.76 0.13 150), oklch(0.56 0.12 150)));
+  background: linear-gradient(to right, var(--heat-fuzzy-low), var(--heat-fuzzy-high));
 }
 
 /* Version lines: one compact unwrapped row each. A narrow column stacks each version into three short lines

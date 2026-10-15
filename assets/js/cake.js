@@ -10,8 +10,6 @@
 
 export const BYTES_PER_ROW = 16384;
 const SEPARATED = 0.006;
-const HUE_RED = 25;
-const HUE_SPAN = 125;
 
 export function rawUrl(repo, path) {
   return `https://raw.githubusercontent.com/${repo}/main/${path}`;
@@ -190,23 +188,27 @@ export function parseMap(svg, symbols) {
   return { fns, rows };
 }
 
-// Hue of a function's color: its fuzzy percent mapped from red (0) to green (100).
-export function hue(percent) {
-  return Math.round(HUE_RED + (Math.min(100, Math.max(0, percent)) / 100) * HUE_SPAN);
+// A function's state on the map: exact at 100 %, none at 0 %, fuzzy in between.
+export function state(percent) {
+  return percent >= 100 ? 'exact' : percent > 0 ? 'fuzzy' : 'none';
 }
 
 export function legend() {
-  return '<p class="legend"><span>0 %</span><span class="ramp"></span><span>100 %</span></p>';
+  return '<p class="legend"><i class="swatch exact"></i><span>exact</span><span class="ramp"></span><span>fuzzy 0 to 100 %</span><i class="swatch none"></i><span>none</span></p>';
 }
 
-// ROM memory map: one row per 16 KiB, each function a slice as wide as its bytes, colored by its fuzzy percent.
+// ROM memory map: one row per 16 KiB, each function a slice as wide as its bytes, colored by its state: exact, none, or a ramp for fuzzy.
 export function mapHtml({ rows, fns }) {
   const lines = rows
     .map((row) => {
       const label = row.segment ? `<div class="seg">${hex(row.segment.start)}–${hex(row.segment.end)} · ${n(row.segment.count)} fn</div>` : '';
       const edges = row.edges.map((at) => `<b class="edge" style="left:${share(at)}"></b>`).join('');
       const slices = row.slices
-        .map(({ f, left, width }) => `<i${width >= SEPARATED ? ' class="s"' : ''} data-f="${f}" style="left:${share(left)};width:${share(width)};--h:${hue(fns[f].percent)}"></i>`)
+        .map(({ f, left, width }) => {
+          const { percent } = fns[f];
+          const kind = state(percent);
+          return `<i class="${kind}${width >= SEPARATED ? ' s' : ''}" data-f="${f}" style="left:${share(left)};width:${share(width)}${kind === 'fuzzy' ? `;--p:${percent}%` : ''}"></i>`;
+        })
         .join('');
       return `${label}<div class="row"><span class="off">${hex(row.offset)}</span><span class="track">${edges}${slices}</span></div>`;
     })
