@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { figureInner, mapData, mapHtml, parseMap, parseProgress, regionCode, sourceUrls, specRows, versionTable } from '../assets/js/cake.js';
+import { detailHtml, figureInner, functionLines, highlightC, sourceUrl, mapData, mapHtml, parseMap, parseProgress, regionCode, sourceUrls, specRows, versionTable } from '../assets/js/cake.js';
 import { progress, svg, symbols } from './fixtures.mjs';
 
 test('sourceUrls point at main of the repo for the default version', () => {
@@ -69,4 +69,32 @@ test('mapHtml draws slices, segment labels and edges; mapData indexes files and 
     fns: [['func_80000400', 0, 100, 256, 0x1000, 3], ['step', 0, 87.5, 512, 0x3f00, 40], ['func_80000900', -1, 0, 64, 0xc040, 0]],
   });
   assert.match(figureInner(model, 'Org/game-one'), /^<p class="readout" hidden><\/p>\n<script type="application\/json" class="map-data">/);
+});
+
+const code = `int other(void) { return 1; }
+/* } */
+static int step(int x) {
+  char c = '}';
+  if (x) { return 0x10; }
+  return "}"[0];
+}
+int after(void) { return 2; }`;
+
+test('functionLines runs from the line to the closing brace and ignores braces in comments and literals', () => {
+  assert.equal(functionLines(code, 3), code.split('\n').slice(2, 7).join('\n'));
+  assert.equal(functionLines(code, 1), 'int other(void) { return 1; }');
+  assert.equal(functionLines(code, 99), null);
+  assert.equal(functionLines('int f(void) {', 1), null);
+});
+
+test('highlightC wraps keywords, numbers, strings, comments and preprocessor lines and escapes the rest', () => {
+  assert.equal(highlightC('#include "a.h"\nif (a < 0x10) /* x */ return "s";'),
+    '<span class="tp">#include &quot;a.h&quot;</span>\n<span class="tk">if</span> (a &lt; <span class="tn">0x10</span>) <span class="tc">/* x */</span> <span class="tk">return</span> <span class="ts">&quot;s&quot;</span>;');
+});
+
+test('detailHtml shows the summary and the C, each only when present; sourceUrl links the line', () => {
+  assert.equal(detailHtml({}), '');
+  assert.equal(detailHtml({ summary: 'adds <1>' }), '<p class="fn-what">adds &lt;1&gt;</p>');
+  assert.match(detailHtml({ code: 'return 1;' }), /^<section class="fn-c"><h3>c<\/h3><pre><span class="tk">return<\/span> <span class="tn">1<\/span>;<\/pre><\/section>$/);
+  assert.equal(sourceUrl('Org/g', 'src/a.c', 3), 'https://github.com/Org/g/blob/main/src/a.c#L3');
 });

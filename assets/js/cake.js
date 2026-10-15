@@ -2,7 +2,9 @@
 // visit. Pure: no DOM, no fetch, so the tests run it in node.
 //   progress.json                {schema:1, carts:[{id, version, functions:{matched,total}, text_pct, bytes:{matched,fuzzy,asm,total}}]}
 //   docs/memory-map-<v>.svg      one <g> per 16 KiB ROM row; each <rect class="qN"> a function slice titled "name · P% · S B"
-//   versions/<v>/symbols.json    {schema:1, functions:{name:{path,line}}}; asm-only functions are absent
+//   versions/<v>/symbols.json    {schema:1, functions:{name:{path, line, summary?}}}; asm-only functions are absent.
+//                                summary: one plain sentence on what the function does; absent until written.
+//   <path>                       the C file at main; a function's source is its text from `line` to its closing brace
 
 export const BYTES_PER_ROW = 16384;
 const SEPARATED = 0.006;
@@ -220,4 +222,47 @@ export function figureInner(model, repo) {
   return `<p class="readout" hidden></p>
 <script type="application/json" class="map-data">${JSON.stringify(mapData(model, repo)).replace(/</g, '\\u003c')}</script>
 ${mapHtml(model)}${legend()}`;
+}
+
+export function sourceUrl(repo, path, line) {
+  return `https://github.com/${repo}/blob/main/${path}#L${line}`;
+}
+
+const BRACES = /\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|[{}]/g;
+
+// The function that starts at 1-based `line` of a C file: that line to the line of the brace closing its body.
+// Braces in comments and literals do not count. Null when the line is out of range or the body never closes.
+export function functionLines(source, line) {
+  const all = source.split('\n');
+  if (!Number.isInteger(line) || line < 1 || line > all.length) return null;
+  const text = all.slice(line - 1).join('\n');
+  let depth = 0;
+  for (const m of text.matchAll(BRACES)) {
+    if (m[0] === '{') depth += 1;
+    else if (m[0] === '}' && (depth -= 1) <= 0) return text.slice(0, m.index + 1);
+  }
+  return null;
+}
+
+const KEYWORDS = new Set('if else for while do switch case default break continue return goto sizeof typedef struct union enum static extern const volatile void char short int long float double unsigned signed register inline u8 s8 u16 s16 u32 s32 u64 s64 f32 f64 NULL'.split(' '));
+const C_TOKEN = /(\/\*[\s\S]*?\*\/|\/\/[^\n]*)|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*')|(^[ \t]*#[^\n]*)|(\b(?:0x[0-9A-Fa-f]+|\d[\d.]*)[fFuUlL]*\b)|(\b[A-Za-z_]\w*\b)/gm;
+
+// C source as HTML with comments, strings, preprocessor lines, numbers and keywords wrapped in spans.
+export function highlightC(code) {
+  let out = '';
+  let at = 0;
+  for (const m of code.matchAll(C_TOKEN)) {
+    const kind = m[1] ? 'c' : m[2] ? 's' : m[3] ? 'p' : m[4] ? 'n' : KEYWORDS.has(m[5]) ? 'k' : null;
+    out += e(code.slice(at, m.index));
+    out += kind ? `<span class="t${kind}">${e(m[0])}</span>` : e(m[0]);
+    at = m.index + m[0].length;
+  }
+  return out + e(code.slice(at));
+}
+
+// The modal body below the facts: what the function does and its C. Both parts are optional.
+export function detailHtml({ summary, code }) {
+  const what = typeof summary === 'string' && summary ? `<p class="fn-what">${e(summary)}</p>` : '';
+  const c = code ? `<section class="fn-c"><h3>c</h3><pre>${highlightC(code)}</pre></section>` : '';
+  return what + c;
 }

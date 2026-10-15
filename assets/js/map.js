@@ -4,9 +4,10 @@
 // on screen; with no copy yet the section says the numbers are unavailable.
 // ROM memory map: hover or keyboard focus shows one function in the readout, lights the other functions of its
 // source file and marks its row and column. A click, tap or Enter opens a dialog with the same facts, steps to
-// the neighbouring functions and links its source line on GitHub. A tap between slices or on a row's offset
+// the neighbouring functions, shows what the function does and its C, and
+// links its source line on GitHub. A tap between slices or on a row's offset
 // picks the nearest slice in the nearest row, so the thinnest functions are reachable on a phone.
-import { figureInner, parseMap, parseProgress, sourceUrls, specHtml, versionTable } from './cake.js';
+import { detailHtml, figureInner, functionLines, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, versionTable } from './cake.js';
 
 const steppers = new Map();
 const fnDialog = document.getElementById('fn');
@@ -87,10 +88,11 @@ async function memoryMap(section) {
     async () => JSON.stringify(await Promise.all([fetched(urls.map), fetched(urls.symbols)])),
     (text) => {
       const [svg, symbols] = JSON.parse(text);
-      const inner = figureInner(parseMap(svg, JSON.parse(symbols)), repo);
+      const table = JSON.parse(symbols);
+      const inner = figureInner(parseMap(svg, table), repo);
       if (fnDialog && fnDialog.open && fnDialog.dataset.map === section.dataset.key) return;
       figure.innerHTML = inner;
-      bind(section);
+      bind(section, table.functions);
     },
   );
   if (end === 'none') unavailable(figure, repo);
@@ -117,7 +119,7 @@ Promise.all(sections.map(numbers)).then((ends) =>
   ),
 );
 
-function bind(section) {
+function bind(section, symbols) {
   const figure = section.querySelector('.figure[data-map]');
   const data = JSON.parse(figure.querySelector('.map-data').textContent);
   const map = figure.querySelector('.map');
@@ -136,7 +138,7 @@ function bind(section) {
   data.fns.forEach((fn, f) => fn[1] >= 0 && push(byUnit, fn[1], f));
 
   const hex = (value) => `0x${value.toString(16).toUpperCase().padStart(6, '0')}`;
-  const source = (f) => (data.fns[f][1] < 0 ? null : `https://github.com/${data.repo}/blob/main/${data.units[data.fns[f][1]]}#L${data.fns[f][5]}`);
+  const source = (f) => (data.fns[f][1] < 0 ? null : sourceUrl(data.repo, data.units[data.fns[f][1]], data.fns[f][5]));
   let lit = [];
   let current = -1;
   let slice = null;
@@ -192,6 +194,16 @@ function bind(section) {
     ];
   }
 
+  // The C file of a function, fetched once per file and kept for the rest of the visit.
+  const files = new Map();
+  const cText = (f) => {
+    const fn = data.fns[f];
+    if (fn[1] < 0) return Promise.resolve(null);
+    const path = data.units[fn[1]];
+    if (!files.has(path)) files.set(path, fetched(rawUrl(data.repo, path)).catch(() => null));
+    return files.get(path).then((text) => (text ? functionLines(text, fn[5]) : null));
+  };
+
   let picked = -1;
   function detail(f) {
     if (!dialog || f < 0) return;
@@ -210,6 +222,12 @@ function bind(section) {
         return div;
       }),
     );
+    const body = dialog.querySelector('.fn-body');
+    const summary = Object.hasOwn(symbols, data.fns[f][0]) ? symbols[data.fns[f][0]].summary : undefined;
+    body.innerHTML = detailHtml({ summary });
+    cText(f).then((code) => {
+      if (picked === f && code) body.innerHTML = detailHtml({ summary, code });
+    });
     const link = dialog.querySelector('.fn-source');
     const url = source(f);
     link.hidden = !url;

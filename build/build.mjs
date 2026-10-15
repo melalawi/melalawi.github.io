@@ -113,6 +113,7 @@ ${site.games.map(romSection).join('\n')}
 <dialog class="modal" id="fn" aria-labelledby="fn-title">
 <div class="modal-head"><h2 id="fn-title"></h2>${CLOSE}</div>
 <dl class="spec"></dl>
+<div class="fn-body"></div>
 <p class="modal-actions"><button type="button" class="step" data-step="-1" aria-label="previous function">‹ prev</button><button type="button" class="step" data-step="1" aria-label="next function">next ›</button><a class="fn-source" target="_blank" rel="noopener">source</a></p>
 </dialog>
 <script type="module" src="/js/map.js"></script>`),
