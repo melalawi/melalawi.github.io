@@ -74,6 +74,13 @@ function resumeDialog(resume) {
 </dialog>`;
 }
 
+// Cloudflare Web Analytics, when site.json names a beacon token.
+export function analyticsBeacon(analytics) {
+  if (!analytics?.cloudflare) return '';
+  const config = e(JSON.stringify({ token: analytics.cloudflare }));
+  return `<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="${config}"></script>\n`;
+}
+
 // A circle, half filled: one glyph for both themes.
 const THEME_GLYPH = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg>';
 
@@ -107,7 +114,7 @@ ${body}
 </div>
 ${resumeDialog(site.resume)}
 <script>${THEME_TOGGLE}${MODALS}</script>
-</body>
+${analyticsBeacon(site.analytics)}</body>
 </html>
 `;
 }

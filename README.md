@@ -20,7 +20,7 @@ The build writes `dist/`. The dev server binds every interface on port 4380 or t
 - Posts go in `posts/YYYY/MM-DD-slug.md` with `title`, `date`, `tags` and `summary` front matter.
 - Pages live in `content/`.
 - Archive entries are one file each in `content/archive/`.
-- Site facts and the ROM repos are in `site.json`.
+- Site facts, the ROM repos and the Cloudflare Web Analytics token are in `site.json`.
 - Type is the reader's own book serif everywhere, so the site loads no web fonts.
 
 ## cake unbake

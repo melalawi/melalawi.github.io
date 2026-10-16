@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ROOT, renderSite } from '../build/build.mjs';
 import { parsePost } from '../build/blog.mjs';
-import { anchorHeadings, bookIndex } from '../build/html.mjs';
+import { analyticsBeacon, anchorHeadings, bookIndex } from '../build/html.mjs';
 
 const games = [{ id: 'one', repo: 'Org/game-one', wiki: 'https://wiki.test/Game_One', versions: ['us', 'eu'], default: 'us' }];
 const site = {
@@ -65,6 +65,21 @@ test('attic lists cake unbake then archive as the last row; the archive lists co
   assert.match(archive, /<img class="icon" src="\/i.png" alt="" width="20" height="20"><span><strong>Ext<\/strong>/);
   assert.ok(archive.includes('2015 · <a href="https://example.test/ext">source</a>'));
   assert.ok(!/defunct|for fun/.test(attic + archive));
+});
+
+test('analyticsBeacon renders the Cloudflare beacon only when a token is set, and every page carries it', () => {
+  assert.equal(analyticsBeacon(undefined), '');
+  assert.equal(analyticsBeacon({}), '');
+  assert.equal(
+    analyticsBeacon({ cloudflare: 'abc' }),
+    '<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{&quot;token&quot;:&quot;abc&quot;}"></script>\n',
+  );
+  const pages = { home: page(), contact: page(), 404: page(), 'cake-unbake': page() };
+  const out = renderSite({ site: { ...site, analytics: { cloudflare: 'abc' } }, pages, archive: [], posts: [], cartridges: { one: 'NUS-NXXE-1' } });
+  for (const [path, html] of out) {
+    if (path.endsWith('.html')) assert.match(html, /data-cf-beacon="\{&quot;token&quot;:&quot;abc&quot;\}"><\/script>\n<\/body>/, path);
+  }
+  assert.ok(!render().get('index.html').includes('cloudflareinsights'));
 });
 
 test('anchorHeadings gives each h2 a slug id', () => {

@@ -50,5 +50,8 @@
   "resume": {
     "drive": "1L1TUCZBAtHqIHeMF9thk8V1ES6_N6MaT",
     "updated": "2021-09-08"
+  },
+  "analytics": {
+    "cloudflare": "27b28b8c62b147fdb3b482ddf2955358"
   }
 }
