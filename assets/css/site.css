@@ -505,12 +505,12 @@ a {
 }
 
 .track i.exact,
-.swatch.exact {
+.scale i.exact {
   background: var(--heat-exact);
 }
 
 .track i.none,
-.swatch.none {
+.scale i.none {
   background: var(--heat-none);
 }
 
@@ -518,25 +518,37 @@ a {
   background: color-mix(in oklab, var(--heat-fuzzy-low), var(--heat-fuzzy-high) var(--p));
 }
 
-.swatch {
-  width: 0.8rem;
-  height: 0.6rem;
-}
-
+/* The key: one bar from none through the fuzzy ramp to exact, 0 % under its left end and 100 % under its right. */
 .legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
+  margin-top: var(--space-2);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
 }
 
-.ramp {
-  width: 6rem;
-  height: 0.6rem;
+.scale {
+  display: grid;
+  grid-template-columns: 2rem 10rem 2rem;
+  column-gap: 2px;
+  row-gap: var(--space-1);
+  width: max-content;
+}
+
+.scale i {
+  height: 0.5rem;
+}
+
+.scale i.fuzzy {
   background: linear-gradient(to right, var(--heat-fuzzy-low), var(--heat-fuzzy-high));
+}
+
+.scale span {
+  white-space: nowrap;
+}
+
+.scale span:last-of-type {
+  grid-column: 3;
+  justify-self: end;
 }
 
 /* Version lines: one compact unwrapped row each. A narrow column stacks each version into three short lines

@@ -193,8 +193,9 @@ export function state(percent) {
   return percent >= 100 ? 'exact' : percent > 0 ? 'fuzzy' : 'none';
 }
 
+// The key is one scale of match: 0 % at the left end, 100 % at the right.
 export function legend() {
-  return '<p class="legend"><i class="swatch exact"></i><span>exact</span><span class="ramp"></span><span>fuzzy 0 to 100 %</span><i class="swatch none"></i><span>none</span></p>';
+  return '<div class="legend"><div class="scale"><i class="none"></i><i class="fuzzy"></i><i class="exact"></i><span>0 %</span><span>100 %</span></div></div>';
 }
 
 // ROM memory map: one row per 16 KiB, each function a slice as wide as its bytes, colored by its state: exact, none, or a ramp for fuzzy.
