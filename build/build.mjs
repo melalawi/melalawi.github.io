@@ -26,8 +26,10 @@ async function walk(dir) {
 }
 
 async function loadContent(root, fetchSource) {
-  const site = JSON.parse(await readFile(join(root, 'site.json'), 'utf8'));
-  const cartridges = Object.fromEntries(await Promise.all(site.games.map(async (game) => [game.id, await cartridgeId(game, fetchSource)])));
+  const full = JSON.parse(await readFile(join(root, 'site.json'), 'utf8'));
+  const ids = await Promise.all(full.games.map((game) => cartridgeId(game, fetchSource)));
+  const site = { ...full, games: full.games.filter((_, i) => ids[i]) };
+  const cartridges = Object.fromEntries(site.games.map((game) => [game.id, ids[full.games.indexOf(game)]]));
   const pages = {};
   for (const name of ['home', 'contact', '404', 'cake-unbake']) {
     pages[name] = splitFrontMatter(await readFile(join(root, 'content', `${name}.md`), 'utf8'));

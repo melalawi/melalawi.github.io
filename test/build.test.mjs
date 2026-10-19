@@ -174,3 +174,34 @@ test('the memory map page carries one function dialog with steps and a source li
   assert.equal(html.match(/<dialog class="modal" id="fn"/g).length, 1);
   assert.match(html, /data-step="-1"[\s\S]*data-step="1"[\s\S]*class="fn-source"/);
 });
+
+test('a game whose repo has no schema 2 progress.json on main is left out of the cake unbake page and the build still succeeds', async () => {
+  const { mkdir, mkdtemp, rm } = await import('node:fs/promises');
+  const { progress: fixture } = await import('./fixtures.mjs');
+  const real = JSON.parse(await readFile(join(ROOT, 'site.json'), 'utf8'));
+  const [first, second] = real.games;
+  const id = (v) => `NUS-NXXE-${v.length}`;
+  const doc = { ...fixture, carts: first.versions.map((v) => ({ ...fixture.carts[1], version: v, id: id(v) })), map: { ...fixture.map, version: first.default } };
+  const fmt = (n) => n.toLocaleString('en-US');
+  const readme = doc.carts.map((c) => `| ${c.version} (${c.id}, North America). SHA256 \`x\` |\n|---|\n| <pre><code>code      [█░░░]  50.00%  ${fmt(c.code.matched)} of ${fmt(c.code.total)}</code><br><code>functions [█░░░]  50.00%  ${fmt(c.functions.matched)} of ${fmt(c.functions.total)}</code></pre> |\n`).join('\n');
+  const fetchSource = async (url) => {
+    const [, repo, path] = /githubusercontent\.com\/(.+?\/.+?)\/main\/(.+)$/.exec(url);
+    if (repo !== first.repo) throw Object.assign(new Error(`${url}: HTTP 404`), { status: 404 });
+    return path === 'progress.json' ? JSON.stringify(doc) : readme;
+  };
+  await mkdir(join(ROOT, 'dist'), { recursive: true });
+  const outDir = await mkdtemp(join(ROOT, 'dist', 'test-'));
+  const warn = console.warn;
+  const warnings = [];
+  console.warn = (m) => warnings.push(m);
+  try {
+    await (await import('../build/build.mjs')).build({ outDir, fetchSource });
+    const html = await readFile(join(outDir, 'attic/cake-unbake/index.html'), 'utf8');
+    assert.ok(html.includes(`data-repo="${first.repo}"`));
+    assert.ok(!html.includes(`data-repo="${second.repo}"`));
+    assert.match(warnings.join('\n'), new RegExp(`skipping ${second.repo}`));
+  } finally {
+    console.warn = warn;
+    await rm(outDir, { recursive: true, force: true });
+  }
+});

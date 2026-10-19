@@ -37,10 +37,18 @@ export function mismatches(version, cart, readme) {
 }
 
 // The cartridge ID of the game's default version after every listed version's totals agree; throws on any mismatch.
+// A game whose repo has no schema 2 progress.json on main has no data yet: null, so the page leaves it out.
 export async function cartridgeId(game, fetchText) {
   const get = (path) => fetchText(rawUrl(game.repo, path));
-  const [progress, readme] = await Promise.all([get('progress.json').then(JSON.parse), get('README.md').then(parseReadme)]);
-  if (progress.schema !== 2) throw new Error(`${game.repo} progress.json is not schema 2`);
+  const progress = await get('progress.json').then(JSON.parse, (error) => {
+    if (error.status === 404) return null;
+    throw error;
+  });
+  if (!progress || progress.schema !== 2) {
+    console.warn(`skipping ${game.repo}: no schema 2 progress.json on main`);
+    return null;
+  }
+  const readme = parseReadme(await get('README.md'));
   const problems = game.versions.flatMap((version) => {
     const cart = progress.carts.find((c) => c.version === version);
     return cart ? mismatches(version, cart, readme.get(version)) : [`${version}: progress.json has no cart`];
@@ -51,6 +59,6 @@ export async function cartridgeId(game, fetchText) {
 
 export async function fetchText(url) {
   const response = await fetch(url, { signal: AbortSignal.timeout(60000) });
-  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+  if (!response.ok) throw Object.assign(new Error(`${url}: HTTP ${response.status}`), { status: response.status });
   return response.text();
 }
