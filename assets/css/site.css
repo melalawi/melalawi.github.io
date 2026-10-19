@@ -518,6 +518,66 @@ a {
   background: color-mix(in oklab, var(--heat-fuzzy-low), var(--heat-fuzzy-high) var(--p));
 }
 
+.track i[data-f] {
+  cursor: pointer;
+}
+
+/* Data is a credited global range: the exact ink, thinned so it reads apart from code. Boot is the strong edge color. Unknown
+   is the empty track, only a faint wash so a row of it still shows. */
+.track i.data {
+  background: color-mix(in oklab, var(--heat-exact) 55%, transparent);
+}
+
+.track i.platform {
+  background: var(--color-edge-strong);
+}
+
+.track i.unknown {
+  background: color-mix(in oklab, var(--color-edge) 45%, transparent);
+}
+
+.track i.blob.identified,
+.key i.blob.identified {
+  background: var(--heat-blob-identified);
+}
+
+.track i.blob.decoded,
+.key i.blob.decoded {
+  background: var(--heat-blob-decoded);
+}
+
+/* The layer checkboxes and the blob key sit in the legend, in its small muted type. */
+.layers,
+.key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.key {
+  margin: var(--space-2) 0 0;
+}
+
+.layers label,
+.key span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.layers input {
+  accent-color: var(--color-accent);
+}
+
+.key i {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.5rem;
+}
+
 /* The key: one bar from none through the fuzzy ramp to exact, 0 % under its left end and 100 % under its right. */
 .legend {
   margin-top: var(--space-2);
@@ -567,7 +627,7 @@ a {
   font-style: italic;
 }
 
-@container (max-width: 34rem) {
+@container (max-width: 52rem) {
   .versions thead {
     position: absolute;
     width: 1px;
@@ -577,10 +637,8 @@ a {
   }
 
   .versions tr {
-    display: grid;
-    grid-template-columns: repeat(3, auto);
-    grid-template-areas: 'v c c' 'f t z' 'b b a';
-    justify-content: space-between;
+    display: flex;
+    flex-wrap: wrap;
     gap: 0 var(--space-3);
     padding: var(--space-2) 0;
     border-bottom: 1px solid var(--color-edge);
@@ -592,13 +650,10 @@ a {
     border: 0;
   }
 
-  .versions td:nth-child(1) { grid-area: v; }
-  .versions td:nth-child(2) { grid-area: c; }
-  .versions td:nth-child(3) { grid-area: f; }
-  .versions td:nth-child(4) { grid-area: t; }
-  .versions td:nth-child(5) { grid-area: b; }
-  .versions td:nth-child(6) { grid-area: z; }
-  .versions td:nth-child(7) { grid-area: a; }
+
+  .versions td:nth-child(2) {
+    flex-basis: 100%;
+  }
 
   .versions td[data-label]::before {
     content: attr(data-label) ' ';

@@ -1,13 +1,14 @@
-// Cake unbake: the built page has no numbers. Each ROM section reads its repo's progress.json from main on every
-// visit, and fetches the memory map SVG and symbols.json only once its figure nears the screen. The last good copy
-// of each source is kept in this browser and drawn first, so a failed or malformed fetch keeps the last numbers
-// on screen; with no copy yet the section says the numbers are unavailable.
+// Cake unbake: the built page has no numbers. Each ROM section reads its repo's progress.json (schema 2: the numbers and
+// the memory map) from main on every visit and draws the map once its figure nears the screen. The last good copy is
+// kept in this browser and drawn first, so a failed or malformed fetch keeps the last numbers on screen; with no copy
+// yet the section says the numbers are unavailable. Five checkboxes show or hide the code, data, blobs, platform and
+// unknown layers of the map; the choice is kept in this browser (cake:layers) and redraws from the parsed map.
 // ROM memory map: hover or keyboard focus shows one function in the readout, lights the other functions of its
 // source file and marks its row and column. A click, tap or Enter opens a dialog with the same facts, steps to
 // the neighbouring functions, shows what the function does and its C, and
 // links its source line on GitHub. A tap between slices or on a row's offset
 // picks the nearest slice in the nearest row, so the thinnest functions are reachable on a phone.
-import { detailHtml, figureInner, functionLines, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, versionTable } from './cake.js';
+import { detailHtml, figureInner, functionLines, LAYERS, parseLayers, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, versionTable } from './cake.js';
 
 const steppers = new Map();
 const fnDialog = document.getElementById('fn');
@@ -67,36 +68,57 @@ const unavailable = (box, repo) => {
   box.innerHTML = `<p class="status">unavailable right now · <a href="https://github.com/${repo}">source</a></p>`;
 };
 
+// Per section: the progress.json document on screen and the map parsed from it (once its figure is near the screen).
+const docs = new Map();
+
 async function numbers(section) {
   const { repo, version } = section.dataset;
   const versions = section.dataset.versions.split(' ');
   const box = section.querySelector('.numbers');
-  const end = await source(`cake:${repo}:progress`, () => fetched(sourceUrls(repo, version).progress), (text) => {
-    const carts = parseProgress(JSON.parse(text), versions);
+  const end = await source(`cake:${repo}:progress`, () => fetched(sourceUrls(repo).progress), (text) => {
+    const document_ = JSON.parse(text);
+    const carts = parseProgress(document_, versions);
     box.innerHTML = specHtml(carts[versions.indexOf(version)], versions, repo) + (versions.length > 1 ? versionTable(carts) : '');
+    docs.set(section, document_);
+    if (docs.get(`${section.dataset.key}:wanted`)) {
+      try {
+        redraw(section);
+      } catch {
+        unavailable(section.querySelector('.figure[data-map]'), repo);
+      }
+    }
   });
   if (end === 'none') unavailable(box, repo);
   return end;
 }
 
-async function memoryMap(section) {
+const layers = () => parseLayers(stored('cake:layers'));
+const parsed = new Map();
+
+// Draw the map of the section's document with the stored layers. Throws when the document has no usable map.
+function redraw(section) {
   const { repo, version } = section.dataset;
-  const urls = sourceUrls(repo, version);
   const figure = section.querySelector('.figure[data-map]');
-  const end = await source(
-    `cake:${repo}:${version}:map`,
-    async () => JSON.stringify(await Promise.all([fetched(urls.map), fetched(urls.symbols)])),
-    (text) => {
-      const [svg, symbols] = JSON.parse(text);
-      const table = JSON.parse(symbols);
-      const inner = figureInner(parseMap(svg, table), repo);
-      if (fnDialog && fnDialog.open && fnDialog.dataset.map === section.dataset.key) return;
-      figure.innerHTML = inner;
-      bind(section, table.functions);
-    },
-  );
-  if (end === 'none') unavailable(figure, repo);
-  return end;
+  const map = docs.get(section).map;
+  if (!map || map.version !== version) throw new TypeError(`progress.json has no map for ${version}`);
+  if (parsed.get(section) !== map) parsed.set(section, { map, model: parseMap(map) });
+  const inner = figureInner(parsed.get(section).model, repo, layers());
+  if (fnDialog && fnDialog.open && fnDialog.dataset.map === section.dataset.key) return;
+  figure.innerHTML = inner;
+  bind(section);
+}
+
+async function memoryMap(section) {
+  docs.set(`${section.dataset.key}:wanted`, true);
+  const figure = section.querySelector('.figure[data-map]');
+  try {
+    if (!docs.has(section)) throw new Error('no numbers yet');
+    redraw(section);
+    return 'live';
+  } catch {
+    unavailable(figure, section.dataset.repo);
+    return 'none';
+  }
 }
 
 const sections = [...document.querySelectorAll('section.rom[data-repo]')];
@@ -118,8 +140,23 @@ Promise.all(sections.map(numbers)).then((ends) =>
     near(section.querySelector('.figure[data-map]'), () => memoryMap(section).then((map) => (section.dataset.live = `${ends[i]} ${map}`))),
   ),
 );
+document.addEventListener('change', (event) => {
+  const box = event.target.closest && event.target.closest('input[data-layer]');
+  const section = box && box.closest('section.rom');
+  if (!section) return;
+  const shown = LAYERS.filter((name) => section.querySelector(`input[data-layer="${name}"]`).checked);
+  store('cake:layers', JSON.stringify(shown));
+  for (const other of sections) {
+    if (!docs.has(other) || !other.querySelector('.map')) continue;
+    try {
+      redraw(other);
+    } catch {
+      // The map in view stays as drawn.
+    }
+  }
+});
 
-function bind(section, symbols) {
+function bind(section) {
   const figure = section.querySelector('.figure[data-map]');
   const data = JSON.parse(figure.querySelector('.map-data').textContent);
   const map = figure.querySelector('.map');
@@ -136,6 +173,9 @@ function bind(section, symbols) {
     push(byFn, f, slice);
   }
   data.fns.forEach((fn, f) => fn[1] >= 0 && push(byUnit, fn[1], f));
+  // The pieces on screen in ROM order: hidden layers have no slices, so the steps and arrows skip them.
+  const order = [...byFn.keys()].sort((a, b) => a - b);
+  const neighbour = (f, step) => order[Math.min(order.length - 1, Math.max(0, order.indexOf(f) + step))];
 
   const hex = (value) => `0x${value.toString(16).toUpperCase().padStart(6, '0')}`;
   const source = (f) => (data.fns[f][1] < 0 ? null : sourceUrl(data.repo, data.units[data.fns[f][1]], data.fns[f][5]));
@@ -179,18 +219,27 @@ function bind(section, symbols) {
       }
     }
     map.classList.add('lit');
-    const unit = fn[1] >= 0 ? data.units[fn[1]].split('/').pop() : 'asm';
-    readout.textContent = `${fn[0]} · ${unit} · ${fn[2]} % · ${fn[3]} B · ${hex(fn[4])}`;
+    readout.textContent = `${fn[0]} · ${about(fn)} · ${fn[3]} B · ${hex(fn[4])}`;
     mark(el || byFn.get(f)[0]);
+  }
+
+  // What the readout names after the item: code its file and match, a blob its type and state, data and platform their layer.
+  function about(fn) {
+    if (fn[7] === 'code') return `${fn[1] >= 0 ? data.units[fn[1]].split('/').pop() : 'asm'} · ${fn[2]} %`;
+    if (fn[7] === 'blobs') return `${fn[8][1]} · ${fn[8][0]}`;
+    return fn[7];
   }
 
   function facts(f) {
     const fn = data.fns[f];
+    const end = ['size', `${fn[3]} B`], at = ['rom offset', hex(fn[4])], to = ['rom end', hex(fn[4] + fn[3])];
+    if (fn[7] === 'blobs') return [['id', fn[0]], ['type', fn[8][1]], ['state', fn[8][0]], at, to, end];
+    if (fn[7] !== 'code') return [['layer', fn[7]], at, to, end];
     return [
       ['file', fn[1] >= 0 ? data.units[fn[1]] : 'asm'],
       ['match', `${fn[2]} %`],
-      ['size', `${fn[3]} B`],
-      ['rom offset', hex(fn[4])],
+      end,
+      at,
       ...(fn[6] ? [['words', `${fn[6][0]} / ${fn[6][1]}`]] : []),
     ];
   }
@@ -224,21 +273,20 @@ function bind(section, symbols) {
       }),
     );
     const body = dialog.querySelector('.fn-body');
-    const summary = Object.hasOwn(symbols, data.fns[f][0]) ? symbols[data.fns[f][0]].summary : undefined;
-    body.innerHTML = detailHtml({ summary });
+    body.innerHTML = '';
     cText(f).then((code) => {
-      if (picked === f && code) body.innerHTML = detailHtml({ summary, code });
+      if (picked === f && code) body.innerHTML = detailHtml({ code });
     });
     const link = dialog.querySelector('.fn-source');
     const url = source(f);
     link.hidden = !url;
     if (url) link.href = url;
-    dialog.querySelector('[data-step="-1"]').disabled = f === 0;
-    dialog.querySelector('[data-step="1"]').disabled = f === data.fns.length - 1;
+    dialog.querySelector('[data-step="-1"]').disabled = f === order[0];
+    dialog.querySelector('[data-step="1"]').disabled = f === order[order.length - 1];
     if (!dialog.open) dialog.showModal();
   }
   steppers.set(section.dataset.key, (step) => {
-    const f = Math.min(data.fns.length - 1, Math.max(0, picked + step));
+    const f = neighbour(picked, step);
     move(f);
     detail(f);
   });
@@ -301,21 +349,21 @@ function bind(section, symbols) {
     show(Number(el.dataset.f), el);
     detail(Number(el.dataset.f));
   });
-  map.addEventListener('focus', () => current < 0 && move(0));
+  map.addEventListener('focus', () => current < 0 && order.length && move(order[0]));
   map.addEventListener('blur', () => (dialog && dialog.open ? null : show(-1)));
   if (dialog) dialog.addEventListener('close', () => (document.activeElement === map ? null : show(-1)));
   map.addEventListener('keydown', (event) => {
     const keys = {
-      ArrowRight: () => move(Math.min(data.fns.length - 1, current + 1)),
-      ArrowLeft: () => move(Math.max(0, current - 1)),
+      ArrowRight: () => move(neighbour(current, 1)),
+      ArrowLeft: () => move(neighbour(current, -1)),
       ArrowDown: () => vertical(1),
       ArrowUp: () => vertical(-1),
-      Home: () => move(0),
-      End: () => move(data.fns.length - 1),
+      Home: () => move(order[0]),
+      End: () => move(order[order.length - 1]),
       Enter: () => detail(current),
       Escape: () => map.blur(),
     };
-    if (!keys[event.key]) return;
+    if (!keys[event.key] || !order.length) return;
     event.preventDefault();
     keys[event.key]();
   });

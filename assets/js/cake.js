@@ -1,26 +1,26 @@
-// Cake unbake data and markup for the page script, which fetches each repo's published files from main on every
+// Cake unbake data and markup for the page script, which fetches each repo's published progress.json from main on every
 // visit. Pure: no DOM, no fetch, so the tests run it in node.
-//   progress.json                {schema:1, carts:[{id, version, functions:{matched,total}, text_pct, bytes:{matched,fuzzy,asm,total}}]}
-//   docs/memory-map-<v>.svg      one <g> per 16 KiB ROM row; each <rect class="qN"> a function slice titled "name · P% · S B"
-//   versions/<v>/symbols.json    {schema:2, functions:{name:{path, line, percent, words:[matched,total], summary?}}}; asm-only
-//                                functions are absent. percent: fuzzy percent 0..100. summary: one plain sentence on what the
-//                                function does; absent until written. Schema 1 (no percent, words) is read until the repos
-//                                publish schema 2, taking the percent from the map slice title; drop that path one release after.
-//   <path>                       the C file at main; a function's source is its text from `line` to its closing brace
+//   progress.json   {schema:2, carts:[{id, version, rom_size, code:{matched,fuzzy,total}, data:{matched,fuzzy,total},
+//                     functions:{matched,fuzzy,total}, blobs:{decoded,identified,total,by_type}, platform, unknown}],
+//                    map:{version, rom_size, fns:[[name, rom, size, percent, path, line]],
+//                         blobs:[[id, rom, size, state, type]], spans:{data:[[from,to]], platform:[[from,to]]}}}
+//                   Every byte of the ROM is one of code, data, platform, blobs or unknown: their sum is rom_size. `map` is
+//                   only for the version the page shows. percent: fuzzy percent 0..100. Blobs in state `observed` are
+//                   not drawn, their bytes are unknown. Anything but schema 2 is rejected.
+//   <path>          the C file at main; a function's source is its text from `line` to its closing brace
 
 export const BYTES_PER_ROW = 16384;
 const SEPARATED = 0.006;
+
+// The five layers of a ROM, in the order the checkboxes and the key list them. All start shown.
+export const LAYERS = ['code', 'data', 'blobs', 'platform', 'unknown'];
 
 export function rawUrl(repo, path) {
   return `https://raw.githubusercontent.com/${repo}/main/${path}`;
 }
 
-export function sourceUrls(repo, version) {
-  return {
-    progress: rawUrl(repo, 'progress.json'),
-    map: rawUrl(repo, `docs/memory-map-${version}.svg`),
-    symbols: rawUrl(repo, `versions/${version}/symbols.json`),
-  };
+export function sourceUrls(repo) {
+  return { progress: rawUrl(repo, 'progress.json') };
 }
 
 export function escapeHtml(value) {
@@ -41,25 +41,42 @@ const whole = (value, what) => {
   if (!Number.isInteger(value) || value < 0) throw new TypeError(`progress.json: ${what} is not a count`);
   return value;
 };
+const bucket = (row, what) => {
+  if (!row || typeof row !== 'object') throw new TypeError(`progress.json: ${what} is missing`);
+  return { matched: whole(row.matched, `${what}.matched`), fuzzy: whole(row.fuzzy, `${what}.fuzzy`), total: whole(row.total, `${what}.total`) };
+};
 
-// The carts of progress.json by version code, checked, for the versions the page lists.
+// The carts of progress.json by version code, checked, for the versions the page lists. The ROM's bytes must add up:
+// code + data + platform + blobs + unknown = rom_size, and blobs = decoded + identified.
 export function parseProgress(progress, versions) {
-  if (!progress || progress.schema !== 1 || !Array.isArray(progress.carts)) throw new TypeError('progress.json is not schema 1');
+  if (!progress || progress.schema !== 2 || !Array.isArray(progress.carts)) throw new TypeError('progress.json is not schema 2');
   const byVersion = new Map();
   for (const cart of progress.carts) {
-    const text = cart.text_pct;
-    if (typeof text !== 'number' || !Number.isFinite(text)) throw new TypeError(`progress.json: ${cart.version} text_pct`);
+    const code = bucket(cart.code, 'code');
+    const data = bucket(cart.data, 'data');
+    const functions = bucket(cart.functions, 'functions');
+    const blobs = cart.blobs || {};
+    const decoded = whole(blobs.decoded, 'blobs.decoded');
+    const identified = whole(blobs.identified, 'blobs.identified');
+    const total = whole(blobs.total, 'blobs.total');
+    const platform = whole(cart.platform, 'platform');
+    const unknown = whole(cart.unknown, 'unknown');
+    const romSize = whole(cart.rom_size, 'rom_size');
+    if (decoded + identified !== total) throw new TypeError(`progress.json: ${cart.version} blobs decoded + identified is not total`);
+    if (code.total + data.total + platform + total + unknown !== romSize) throw new TypeError(`progress.json: ${cart.version} bytes do not add up to rom_size`);
     byVersion.set(cart.version, {
       version: String(cart.version),
       id: String(cart.id),
       revision: Number((/-(\d+)$/.exec(cart.id) || [0, 0])[1]),
-      fn: whole(cart.functions.matched, 'functions.matched'),
-      fnTotal: whole(cart.functions.total, 'functions.total'),
-      text,
-      bytes: whole(cart.bytes.matched, 'bytes.matched'),
-      fuzzy: whole(cart.bytes.fuzzy, 'bytes.fuzzy'),
-      asm: whole(cart.bytes.asm, 'bytes.asm'),
-      bytesTotal: whole(cart.bytes.total, 'bytes.total'),
+      fn: functions.matched,
+      fnTotal: functions.total,
+      text: code.total ? (code.matched / code.total) * 100 : 0,
+      code,
+      data,
+      blobs: { decoded, identified, total, types: blobs.by_type && typeof blobs.by_type === 'object' ? blobs.by_type : {} },
+      platform,
+      unknown,
+      romSize,
     });
   }
   return versions.map((version) => {
@@ -73,7 +90,15 @@ export function regionCode(version) {
   return version.split('-')[0];
 }
 
+// The blob census as one line: blobs per type, every state counted ("texture 4 · sound 2").
+export function blobTypes(types) {
+  return Object.entries(types)
+    .map(([type, states]) => `${type} ${n(Object.values(states).reduce((a, b) => a + b, 0))}`)
+    .join(' · ');
+}
+
 export function specRows(cart, versions) {
+  const census = blobTypes(cart.blobs.types);
   return [
     ['cartridge', cart.id],
     ['region', regionCode(cart.version)],
@@ -81,9 +106,14 @@ export function specRows(cart, versions) {
     ['versions', versions.join(', ')],
     ['matched fn', `${n(cart.fn)} / ${n(cart.fnTotal)}`],
     ['% .text', `${cart.text.toFixed(2)} %`],
-    ['matched bytes', `${n(cart.bytes)} / ${n(cart.bytesTotal)} B`],
-    ['fuzzy bytes', `${n(cart.fuzzy)} B`],
-    ['asm bytes', `${n(cart.asm)} B`],
+    ['code bytes', `${n(cart.code.matched)} / ${n(cart.code.total)} B`],
+    ['fuzzy bytes', `${n(cart.code.fuzzy)} B`],
+    ['data bytes', `${n(cart.data.matched)} / ${n(cart.data.total)} B`],
+    ['blobs bytes', `${n(cart.blobs.decoded)} decoded + ${n(cart.blobs.identified)} identified B`],
+    ...(census ? [['blob types', census]] : []),
+    ['platform bytes', `${n(cart.platform)} B`],
+    ['unknown bytes', `${n(cart.unknown)} B`],
+    ['rom', `${n(cart.romSize)} B`],
   ];
 }
 
@@ -92,7 +122,8 @@ export function specHtml(cart, versions, repo) {
   return `<dl class="spec">${rows}<div><a href="https://github.com/${e(repo)}">source</a></div></dl>`;
 }
 
-// One line per ROM version: version code, cartridge (its code carries region and revision) and the counts.
+// One line per ROM version: version code, cartridge (its code carries region and revision) and the counts. Fuzzy, platform and
+// the blob decoded/identified split are on the spec rows; blobs B here is decoded of all blob bytes.
 // data-label is the short label a narrow column shows beside each value once the header row is hidden.
 export function versionTable(carts) {
   const cell = (label, value) => `<td data-label="${label}">${value}</td>`;
@@ -100,92 +131,97 @@ export function versionTable(carts) {
     .map((c) => `<tr><td>${e(c.version)}</td><td>${e(c.id)}</td>${[
       cell('fn', `${n(c.fn)}/${n(c.fnTotal)}`),
       cell('.text', pct(c.text)),
-      cell('B', `${n(c.bytes)}/${n(c.bytesTotal)}`),
-      cell('fuzzy B', n(c.fuzzy)),
-      cell('asm B', n(c.asm)),
+      cell('code B', `${n(c.code.matched)}/${n(c.code.total)}`),
+      cell('data B', `${n(c.data.matched)}/${n(c.data.total)}`),
+      cell('blobs B', `${n(c.blobs.decoded)}/${n(c.blobs.total)}`),
+      cell('unknown B', n(c.unknown)),
     ].join('')}</tr>`)
     .join('\n');
   return `<div class="versions"><table class="table">
-<thead><tr><th>version</th><th>cartridge</th><th>matched fn</th><th>% .text</th><th>matched B</th><th>fuzzy B</th><th>asm B</th></tr></thead>
+<thead><tr><th>version</th><th>cartridge</th><th>matched fn</th><th>% .text</th><th>code B</th><th>data B</th><th>blobs B</th><th>unknown B</th></tr></thead>
 <tbody>
 ${body}
 </tbody>
 </table></div>`;
 }
 
-const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
-const unescape = (text) => text.replace(/&(amp|lt|gt|quot|apos);/g, (all, name) => ENTITIES[name]);
+// What wins a byte several rows claim: code, data, platform, decoded blobs, identified blobs; then unknown.
+const RANK = { code: 0, data: 1, platform: 2, decoded: 3, identified: 4 };
+const LAYER_OF = { code: 'code', data: 'data', platform: 'platform', blobs: 'blobs' };
 
-// The published memory map SVG as functions in ROM order and rows of slices. The track starts at the leftmost
-// slice x of any row and spans the rest of the view box; a slice's ROM offset is its row offset plus its x share.
-// A function split over two rows is one function. Segments split at gaps in the row offsets and at the hairline
-// marks (class h); each segment's first row carries its range and function count and an edge where it starts.
-export function parseMap(svg, symbols) {
-  const view = /viewBox="0 0 ([\d.]+) [\d.]+"/.exec(svg);
-  if (!view) throw new TypeError('memory map has no viewBox');
-  if (!symbols || ![1, 2].includes(symbols.schema) || typeof symbols.functions !== 'object') throw new TypeError('symbols.json is not schema 1 or 2');
-  const groups = [...svg.matchAll(/<g transform="translate\(0 [\d.]+\)"><text[^>]*>([0-9A-Fa-f]+)<\/text>([\s\S]*?)<\/g>/g)];
-  if (!groups.length) throw new TypeError('memory map has no rows');
-  const parsed = groups.map(([, offset, body]) => ({
-    offset: parseInt(offset, 16),
-    rects: [...body.matchAll(/<rect class="q\d+" x="([\d.]+)" width="([\d.]+)"[^>]*><title>([^<]*)<\/title><\/rect>/g)].map((m) => ({
-      x: Number(m[1]),
-      w: Number(m[2]),
-      title: unescape(m[3]),
-    })),
-    marks: [...body.matchAll(/<rect class="h" x="([\d.]+)"/g)].map((m) => Number(m[1])),
-  }));
-  const left = Math.min(...parsed.flatMap((row) => row.rects.map((r) => r.x)));
-  const width = Number(view[1]) - left;
-  const fns = [];
-  const rows = [];
-  const boundaries = [];
-  let last = null;
-  let end = -1;
-  for (const row of parsed) {
-    const slices = [];
-    for (const mark of row.marks) {
-      const at = (mark - left) / width;
-      if (at > 0 && at < 1) boundaries.push(row.offset + Math.round(at * BYTES_PER_ROW));
-    }
-    for (const r of row.rects) {
-      const t = /^(.+) · ([\d.]+)% · (\d+) B$/.exec(r.title);
-      if (!t) throw new TypeError(`memory map slice "${r.title}" is not "name · P% · S B"`);
-      const from = row.offset + Math.round(((r.x - left) / width) * BYTES_PER_ROW);
-      let f = fns.length - 1;
-      // A slice continues the previous function when it has the same name and starts where that slice ended.
-      if (!last || last.name !== t[1] || Math.abs(from - end) > 16) {
-        const symbol = Object.prototype.hasOwnProperty.call(symbols.functions, t[1]) ? symbols.functions[t[1]] : null;
-        last = { name: t[1], percent: symbol && typeof symbol.percent === 'number' ? symbol.percent : Number(t[2]), size: Number(t[3]), rom: from, path: symbol ? symbol.path : null, line: symbol ? symbol.line : null, words: symbol && symbol.words ? symbol.words : null, row: rows.length };
-        fns.push(last);
-        f = fns.length - 1;
-      }
-      fns[f].lastRow = rows.length;
-      end = from + Math.round((r.w / width) * BYTES_PER_ROW);
-      slices.push({ f, left: (r.x - left) / width, width: r.w / width });
-    }
-    rows.push({ offset: row.offset, slices, edges: [] });
-  }
-  // Segments: a new one where a row gap or a hairline mark falls between a function and the one before it.
-  let segment = null;
-  fns.forEach((fn, i) => {
-    const prev = fns[i - 1];
-    const gap = prev && fn.row > prev.lastRow && rows[fn.row].offset !== rows[fn.row - 1].offset + BYTES_PER_ROW;
-    const cut = prev && boundaries.some((b) => b > prev.rom && b <= fn.rom);
-    if (!prev || gap || cut) {
-      const row = rows[fn.row];
-      segment = { start: fn.rom, end: fn.rom + fn.size, count: 0 };
-      if (!row.segment) row.segment = segment;
-      if (fn.rom > row.offset) row.edges.push((fn.rom - row.offset) / BYTES_PER_ROW);
-    }
-    segment.count += 1;
-    segment.end = Math.max(segment.end, fn.rom + fn.size);
+function span(rows, what, romSize) {
+  if (!Array.isArray(rows)) throw new TypeError(`progress.json: map.${what} is not a list`);
+  return rows.map((row) => {
+    const [from, to] = row;
+    if (whole(from, `map.${what} start`) > whole(to, `map.${what} end`) || to > romSize) throw new TypeError(`progress.json: map.${what} range is outside the ROM`);
+    return { from, to };
   });
-  for (const fn of fns) {
-    delete fn.row;
-    delete fn.lastRow;
+}
+
+// Every byte of [0, romSize) once, as pieces {from, to, f}: f the index of the item that wins the byte, -1 for unknown.
+// Adjacent pieces of one item (or both unknown) are joined.
+function tile(items, romSize) {
+  const points = new Set([0, romSize]);
+  for (const item of items) {
+    points.add(item.rom);
+    points.add(item.rom + item.size);
   }
-  return { fns, rows };
+  const edges = [...points].sort((a, b) => a - b);
+  const order = items.map((item, f) => f).sort((a, b) => items[a].rom - items[b].rom);
+  const pieces = [];
+  let next = 0;
+  let active = [];
+  for (let i = 0; i + 1 < edges.length; i += 1) {
+    const from = edges[i];
+    const to = edges[i + 1];
+    while (next < order.length && items[order[next]].rom <= from) active.push(order[next++]);
+    active = active.filter((f) => items[f].rom + items[f].size > from);
+    let best = -1;
+    for (const f of active) if (best < 0 || RANK[items[f].rank] < RANK[items[best].rank]) best = f;
+    const last = pieces[pieces.length - 1];
+    if (last && last.f === best && last.to === from) last.to = to;
+    else pieces.push({ from, to, f: best });
+  }
+  return pieces;
+}
+
+// The memory map of progress.json's `map` as items in ROM order (every function, data span, platform span and blob) and
+// rows of 16 KiB with the pieces each shows. Items that another item outranks keep only the bytes they win; observed
+// blobs are left out (their bytes are unknown).
+export function parseMap(map) {
+  if (!map || typeof map !== 'object') throw new TypeError('progress.json has no map');
+  const romSize = whole(map.rom_size, 'map.rom_size');
+  if (!romSize || !Array.isArray(map.fns) || !Array.isArray(map.blobs) || !map.spans) throw new TypeError('progress.json: map is malformed');
+  const items = [];
+  for (const row of map.fns) {
+    const [name, rom, size, percent, path, line] = row;
+    if (typeof name !== 'string' || typeof percent !== 'number' || !(percent >= 0 && percent <= 100)) throw new TypeError(`progress.json: map function ${name}`);
+    if (whole(rom, `map ${name} rom`) + whole(size, `map ${name} size`) > romSize) throw new TypeError(`progress.json: map function ${name} is outside the ROM`);
+    items.push({ kind: 'code', rank: 'code', name, rom, size, percent, path: path || null, line: path ? line || 0 : null });
+  }
+  for (const row of map.blobs) {
+    const [id, rom, size, stateName, type] = row;
+    if (!['decoded', 'identified', 'observed'].includes(stateName)) throw new TypeError(`progress.json: map blob ${id} state`);
+    if (whole(rom, `map ${id} rom`) + whole(size, `map ${id} size`) > romSize) throw new TypeError(`progress.json: map blob ${id} is outside the ROM`);
+    if (stateName === 'observed') continue;
+    items.push({ kind: 'blobs', rank: stateName, name: String(id), rom, size, state: stateName, type: String(type) });
+  }
+  for (const kind of ['data', 'platform']) {
+    for (const { from, to } of span(map.spans[kind], `spans.${kind}`, romSize)) {
+      items.push({ kind, rank: kind, name: kind, rom: from, size: to - from });
+    }
+  }
+  items.sort((a, b) => a.rom - b.rom || RANK[a.rank] - RANK[b.rank]);
+  const rows = Array.from({ length: Math.ceil(romSize / BYTES_PER_ROW) }, (x, i) => ({ offset: i * BYTES_PER_ROW, slices: [] }));
+  for (const piece of tile(items, romSize)) {
+    for (let at = piece.from; at < piece.to; ) {
+      const row = rows[Math.floor(at / BYTES_PER_ROW)];
+      const end = Math.min(piece.to, row.offset + BYTES_PER_ROW);
+      row.slices.push({ f: piece.f, left: (at - row.offset) / BYTES_PER_ROW, width: (end - at) / BYTES_PER_ROW });
+      at = end;
+    }
+  }
+  return { items, rows, romSize };
 }
 
 // A function's state on the map: exact at 100 %, none at 0 %, fuzzy in between.
@@ -193,45 +229,68 @@ export function state(percent) {
   return percent >= 100 ? 'exact' : percent > 0 ? 'fuzzy' : 'none';
 }
 
-// The key is one scale of match: 0 % at the left end, 100 % at the right.
-export function legend() {
-  return '<div class="legend"><div class="scale"><i class="none"></i><i class="fuzzy"></i><i class="exact"></i><span>0 %</span><span>100 %</span></div></div>';
+// The layers to show from the stored text; anything unreadable shows all five.
+export function parseLayers(text) {
+  try {
+    const list = JSON.parse(text);
+    if (Array.isArray(list) && list.every((name) => LAYERS.includes(name))) return new Set(list);
+  } catch {
+    // Not stored yet, or not JSON: the default below.
+  }
+  return new Set(LAYERS);
 }
 
-// ROM memory map: one row per 16 KiB, each function a slice as wide as its bytes, colored by its state: exact, none, or a ramp for fuzzy.
-export function mapHtml({ rows, fns }) {
+// The key: one checkbox per layer, one scale of match for code (0 % left, 100 % right) and the blob shades.
+export function legend(shown = new Set(LAYERS)) {
+  const boxes = LAYERS.map((name) => `<label><input type="checkbox" data-layer="${name}"${shown.has(name) ? ' checked' : ''}> ${name}</label>`).join('');
+  return `<div class="legend"><div class="layers">${boxes}</div><div class="scale"><i class="none"></i><i class="fuzzy"></i><i class="exact"></i><span>0 %</span><span>100 %</span></div><div class="key"><span><i class="blob identified"></i>identified</span><span><i class="blob decoded"></i>decoded</span></div></div>`;
+}
+
+const layerOf = (model, f) => (f < 0 ? 'unknown' : LAYER_OF[model.items[f].kind]);
+
+// ROM memory map: one row per 16 KiB, each piece a slice as wide as its bytes. Code is colored by its state (exact, none,
+// or a ramp for fuzzy), data, platform and blobs by their own colors, unknown is the empty track. Only the shown layers
+// are drawn and a row with nothing to draw is dropped.
+export function mapHtml(model, shown = new Set(LAYERS)) {
+  const { items, rows } = model;
   const lines = rows
     .map((row) => {
-      const label = row.segment ? `<div class="seg">${hex(row.segment.start)}–${hex(row.segment.end)} · ${n(row.segment.count)} fn</div>` : '';
-      const edges = row.edges.map((at) => `<b class="edge" style="left:${share(at)}"></b>`).join('');
       const slices = row.slices
+        .filter(({ f }) => shown.has(layerOf(model, f)))
         .map(({ f, left, width }) => {
-          const { percent } = fns[f];
-          const kind = state(percent);
-          return `<i class="${kind}${width >= SEPARATED ? ' s' : ''}" data-f="${f}" style="left:${share(left)};width:${share(width)}${kind === 'fuzzy' ? `;--p:${percent}%` : ''}"></i>`;
-        })
-        .join('');
-      return `${label}<div class="row"><span class="off">${hex(row.offset)}</span><span class="track">${edges}${slices}</span></div>`;
+          const place = `left:${share(left)};width:${share(width)}`;
+          const sep = width >= SEPARATED ? ' s' : '';
+          if (f < 0) return `<i class="unknown${sep}" style="${place}"></i>`;
+          const item = items[f];
+          if (item.kind === 'code') {
+            const kind = state(item.percent);
+            return `<i class="${kind}${sep}" data-f="${f}" style="${place}${kind === 'fuzzy' ? `;--p:${item.percent}%` : ''}"></i>`;
+          }
+          return `<i class="${item.kind === 'blobs' ? `blob ${item.state}` : item.kind}${sep}" data-f="${f}" style="${place}"></i>`;
+        });
+      return slices.length ? `<div class="row"><span class="off">${hex(row.offset)}</span><span class="track">${slices.join('')}</span></div>` : '';
     })
+    .filter(Boolean)
     .join('\n');
-  return `<div class="map" aria-label="memory map: arrow keys move between functions, enter or a tap opens its details">${lines}<b class="cross" hidden></b></div>`;
+  return `<div class="map" aria-label="memory map: arrow keys move between pieces, enter or a tap opens its details">${lines}<b class="cross" hidden></b></div>`;
 }
 
-// The compact per-function data the map script reads: [name, file index or -1, percent, size, ROM offset, line, words or null].
+// The compact per-item data the map script reads: [name, file index or -1, percent or null, size, ROM offset, line, words or null,
+// kind, blob [state, type] or null].
 export function mapData(model, repo) {
-  const units = [...new Set(model.fns.map((fn) => fn.path).filter(Boolean))];
+  const units = [...new Set(model.items.map((item) => item.path).filter(Boolean))];
   const index = new Map(units.map((unit, i) => [unit, i]));
   return {
     repo,
     units,
-    fns: model.fns.map((fn) => [fn.name, fn.path ? index.get(fn.path) : -1, fn.percent, fn.size, fn.rom, fn.line || 0, fn.words]),
+    fns: model.items.map((item) => [item.name, item.path ? index.get(item.path) : -1, item.kind === 'code' ? item.percent : null, item.size, item.rom, item.line || 0, null, item.kind, item.kind === 'blobs' ? [item.state, item.type] : null]),
   };
 }
 
-export function figureInner(model, repo) {
+export function figureInner(model, repo, shown = new Set(LAYERS)) {
   return `<p class="readout" hidden></p>
 <script type="application/json" class="map-data">${JSON.stringify(mapData(model, repo)).replace(/</g, '\\u003c')}</script>
-${mapHtml(model)}${legend()}`;
+${mapHtml(model, shown)}${legend(shown)}`;
 }
 
 export function sourceUrl(repo, path, line) {

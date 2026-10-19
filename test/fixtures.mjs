@@ -1,35 +1,59 @@
-// A small published repo: progress.json, a two-segment memory map SVG in the published layout and symbols.json.
-// Row 0x0000: segment edge mark at 0x1000, func_80000400 (exact, 0x1000-0x1100), a.c static `step` (87 %, split
-// over rows 0x0000 and 0x4000 at 0x3F00-0x4100). Row 0xC000 (after a row gap): asm-only func_80000900.
+// Two published repos in progress.json schema 2, built to the unbake report fields (code/data/functions rows, blobs,
+// platform, unknown) and one map for the default version. Every byte of the ROM is one class: they sum to rom_size.
+//
+// Game one, us, ROM 0x20000 (131,072 B):
+//   0x0000-0x1000 platform (4,096)        0x1000-0x1100 func_80000400, exact (256)     0x1100-0x1200 data (256)
+//   0x3F00-0x4100 step, 87.5 % (512, over two rows)                                0x8000-0x9000 blob tex_a, decoded (4,096)
+//   0x9000-0x9800 blob snd_a, identified (2,048)       0xA000-0xA400 blob obs, observed: bytes stay unknown
+//   0xC000-0xC080 blob over, identified, 0xC040-0xC080 of it is func_80000900 (0 %, 64): code wins, blob keeps 64
 export const progress = {
-  schema: 1,
-  head: 'c0ffee',
-  updated: '2026-10-15T10:00:00-07:00',
+  schema: 2,
   carts: [
-    { id: 'NUS-NXXP-0', version: 'eu', functions: { matched: 1, total: 3 }, text_pct: 33.33, bytes: { matched: 256, fuzzy: 512, asm: 64, total: 832 }, toolchain: 'gcc-x' },
-    { id: 'NUS-NXXE-1', version: 'us', functions: { matched: 1234, total: 3 }, text_pct: 30.77, bytes: { matched: 256, fuzzy: 512, asm: 64, total: 832 }, toolchain: 'gcc-x' },
+    {
+      id: 'NUS-NXXP-0', version: 'eu', rom_size: 65536,
+      code: { matched: 256, fuzzy: 0, total: 256 }, data: { matched: 0, fuzzy: 0, total: 0 }, functions: { matched: 1, fuzzy: 0, total: 1 },
+      blobs: { decoded: 0, identified: 0, total: 0, by_type: {} }, platform: 4096, unknown: 61184,
+    },
+    {
+      id: 'NUS-NXXE-1', version: 'us', rom_size: 131072,
+      code: { matched: 256, fuzzy: 448, total: 832 }, data: { matched: 256, fuzzy: 0, total: 256 }, functions: { matched: 1234, fuzzy: 1, total: 3 },
+      blobs: { decoded: 4096, identified: 2112, total: 6208, by_type: { model: { identified: 1 }, sound: { identified: 1 }, texture: { decoded: 1, observed: 1 } } },
+      platform: 4096, unknown: 119680,
+    },
   ],
+  map: {
+    version: 'us',
+    rom_size: 131072,
+    fns: [
+      ['func_80000400', 0x1000, 256, 100, 'src/a.c', 3],
+      ['step', 0x3f00, 512, 87.5, 'src/a.c', 40],
+      ['func_80000900', 0xc040, 64, 0, null, null],
+    ],
+    blobs: [
+      ['tex_a', 0x8000, 4096, 'decoded', 'texture'],
+      ['snd_a', 0x9000, 2048, 'identified', 'sound'],
+      ['obs', 0xa000, 1024, 'observed', 'texture'],
+      ['over', 0xc000, 128, 'identified', 'model'],
+    ],
+    spans: { data: [[0x1100, 0x1200]], platform: [[0, 0x1000]] },
+  },
 };
 
-export const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1096 30" width="1096" height="30"><style>text{font:6px monospace}</style>
-<g transform="translate(0 0)"><text y="6">00000000</text>
-<rect class="h" x="72" width="0.5" height="6"/>
-<rect class="h" x="328" width="0.5" height="6"/>
-<rect class="q10" x="328" width="16" height="6"><title>func_80000400 · 100% · 256 B</title></rect>
-<rect class="q8" x="1080" width="16" height="6"><title>step · 87.5% · 512 B</title></rect>
-</g>
-<g transform="translate(0 8)"><text y="6">00004000</text>
-<rect class="q8" x="72" width="16" height="6"><title>step · 87.5% · 512 B</title></rect>
-</g>
-<g transform="translate(0 16)"><text y="6">0000C000</text>
-<rect class="q0" x="76" width="4" height="6"><title>func_80000900 · 0% · 64 B</title></rect>
-</g>
-</svg>`;
-
-export const symbols = {
-  schema: 1,
-  functions: {
-    func_80000400: { path: 'src/a.c', line: 3 },
-    step: { path: 'src/a.c', line: 40 },
+// Game two has no blob evidence: its blobs row is 0 of 0 and the rest of the ROM is unknown.
+export const progressTwo = {
+  schema: 2,
+  carts: [
+    {
+      id: 'NUS-NBTE-0', version: 'us', rom_size: 65536,
+      code: { matched: 128, fuzzy: 0, total: 192 }, data: { matched: 64, fuzzy: 0, total: 64 }, functions: { matched: 2, fuzzy: 0, total: 3 },
+      blobs: { decoded: 0, identified: 0, total: 0, by_type: {} }, platform: 4096, unknown: 61184,
+    },
+  ],
+  map: {
+    version: 'us',
+    rom_size: 65536,
+    fns: [['alpha', 0x1000, 128, 100, 'src/t.c', 1], ['beta', 0x1080, 64, 0, null, null]],
+    blobs: [],
+    spans: { data: [[0x1200, 0x1240]], platform: [[0, 0x1000]] },
   },
 };
