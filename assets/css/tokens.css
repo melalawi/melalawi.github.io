@@ -18,8 +18,8 @@
   --heat-fuzzy-low: light-dark(#babce8, #4d517f);
   --heat-fuzzy-high: light-dark(#7277c4, #888cc4);
   --heat-exact: light-dark(#1b1a17, #d6d0bd);
-  --heat-blob-identified: light-dark(#e3c27a, #7a6232);
-  --heat-blob-decoded: light-dark(#b87a14, #d9a441);
+  --heat-blob-identified: light-dark(#bfdcd6, #2f4f4a);
+  --heat-blob-decoded: light-dark(#3f8f84, #6fb8ac);
 
 
   --space-1: 0.25rem;
