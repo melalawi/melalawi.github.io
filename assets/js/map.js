@@ -1,14 +1,13 @@
 // Cake unbake: the built page has no numbers. Each ROM section reads its repo's progress.json (schema 2: the numbers and
 // the memory map) from main on every visit and draws the map once its figure nears the screen. The last good copy is
 // kept in this browser and drawn first, so a failed or malformed fetch keeps the last numbers on screen; with no copy
-// yet the section says the numbers are unavailable. Five checkboxes show or hide the code, data, blobs, platform and
-// unknown layers of the map; the choice is kept in this browser (cake:layers) and redraws from the parsed map.
+// yet the section says the numbers are unavailable.  Only code is drawn on the map.
 // ROM memory map: hover or keyboard focus shows one function in the readout, lights the other functions of its
 // source file and marks its row and column. A click, tap or Enter opens a dialog with the same facts, steps to
 // the neighbouring functions, shows what the function does and its C, and
 // links its source line on GitHub. A tap between slices or on a row's offset
 // picks the nearest slice in the nearest row, so the thinnest functions are reachable on a phone.
-import { detailHtml, figureInner, functionLines, LAYERS, parseLayers, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, versionTable } from './cake.js';
+import { detailHtml, figureInner, functionLines, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, versionTable } from './cake.js';
 
 const steppers = new Map();
 const fnDialog = document.getElementById('fn');
@@ -92,17 +91,16 @@ async function numbers(section) {
   return end;
 }
 
-const layers = () => parseLayers(stored('cake:layers'));
 const parsed = new Map();
 
-// Draw the map of the section's document with the stored layers. Throws when the document has no usable map.
+// Draw the map of the section's document. Throws when the document has no usable map.
 function redraw(section) {
   const { repo, version } = section.dataset;
   const figure = section.querySelector('.figure[data-map]');
   const map = docs.get(section).map;
   if (!map || map.version !== version) throw new TypeError(`progress.json has no map for ${version}`);
   if (parsed.get(section) !== map) parsed.set(section, { map, model: parseMap(map) });
-  const inner = figureInner(parsed.get(section).model, repo, layers());
+  const inner = figureInner(parsed.get(section).model, repo);
   if (fnDialog && fnDialog.open && fnDialog.dataset.map === section.dataset.key) return;
   figure.innerHTML = inner;
   bind(section);
@@ -140,22 +138,6 @@ Promise.all(sections.map(numbers)).then((ends) =>
     near(section.querySelector('.figure[data-map]'), () => memoryMap(section).then((map) => (section.dataset.live = `${ends[i]} ${map}`))),
   ),
 );
-document.addEventListener('change', (event) => {
-  const box = event.target.closest && event.target.closest('input[data-layer]');
-  const section = box && box.closest('section.rom');
-  if (!section) return;
-  const shown = LAYERS.filter((name) => section.querySelector(`input[data-layer="${name}"]`).checked);
-  store('cake:layers', JSON.stringify(shown));
-  for (const other of sections) {
-    if (!docs.has(other) || !other.querySelector('.map')) continue;
-    try {
-      redraw(other);
-    } catch {
-      // The map in view stays as drawn.
-    }
-  }
-});
-
 function bind(section) {
   const figure = section.querySelector('.figure[data-map]');
   const data = JSON.parse(figure.querySelector('.map-data').textContent);
@@ -173,7 +155,7 @@ function bind(section) {
     push(byFn, f, slice);
   }
   data.fns.forEach((fn, f) => fn[1] >= 0 && push(byUnit, fn[1], f));
-  // The pieces on screen in ROM order: hidden layers have no slices, so the steps and arrows skip them.
+  // The functions on screen in ROM order.
   const order = [...byFn.keys()].sort((a, b) => a - b);
   const neighbour = (f, step) => order[Math.min(order.length - 1, Math.max(0, order.indexOf(f) + step))];
 
@@ -223,18 +205,14 @@ function bind(section) {
     mark(el || byFn.get(f)[0]);
   }
 
-  // What the readout names after the item: code its file and match, a blob its type and state, data and platform their layer.
+  // What the readout names after the function: its file and match.
   function about(fn) {
-    if (fn[7] === 'code') return `${fn[1] >= 0 ? data.units[fn[1]].split('/').pop() : 'asm'} · ${fn[2]} %`;
-    if (fn[7] === 'blobs') return `${fn[8][1]} · ${fn[8][0]}`;
-    return fn[7];
+    return `${fn[1] >= 0 ? data.units[fn[1]].split('/').pop() : 'asm'} · ${fn[2]} %`;
   }
 
   function facts(f) {
     const fn = data.fns[f];
     const end = ['size', `${fn[3]} B`], at = ['rom offset', hex(fn[4])], to = ['rom end', hex(fn[4] + fn[3])];
-    if (fn[7] === 'blobs') return [['id', fn[0]], ['type', fn[8][1]], ['state', fn[8][0]], at, to, end];
-    if (fn[7] !== 'code') return [['layer', fn[7]], at, to, end];
     return [
       ['file', fn[1] >= 0 ? data.units[fn[1]] : 'asm'],
       ['match', `${fn[2]} %`],

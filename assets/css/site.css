@@ -522,62 +522,6 @@ a {
   cursor: pointer;
 }
 
-/* Data is a credited global range: the exact ink, thinned so it reads apart from code. Boot is the strong edge color. Unknown
-   is the empty track, only a faint wash so a row of it still shows. */
-.track i.data {
-  background: color-mix(in oklab, var(--heat-exact) 55%, transparent);
-}
-
-.track i.platform {
-  background: var(--color-edge-strong);
-}
-
-.track i.unknown {
-  background: color-mix(in oklab, var(--color-edge) 45%, transparent);
-}
-
-.track i.blob.identified,
-.key i.blob.identified {
-  background: var(--heat-blob-identified);
-}
-
-.track i.blob.decoded,
-.key i.blob.decoded {
-  background: var(--heat-blob-decoded);
-}
-
-/* The layer checkboxes and the blob key sit in the legend, in its small muted type. */
-.layers,
-.key {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-  margin-bottom: var(--space-2);
-}
-
-.key {
-  margin: var(--space-2) 0 0;
-}
-
-.layers label,
-.key span {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
-
-.layers input {
-  accent-color: var(--color-accent);
-}
-
-.key i {
-  display: inline-block;
-  width: 0.9rem;
-  height: 0.5rem;
-}
-
 /* The key: one bar from none through the fuzzy ramp to exact, 0 % under its left end and 100 % under its right. */
 .legend {
   margin-top: var(--space-2);

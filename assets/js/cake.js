@@ -12,9 +12,6 @@
 export const BYTES_PER_ROW = 16384;
 const SEPARATED = 0.006;
 
-// The five layers of a ROM, in the order the checkboxes and the key list them. All start shown.
-export const LAYERS = ['code', 'data', 'blobs', 'platform', 'unknown'];
-
 export function rawUrl(repo, path) {
   return `https://raw.githubusercontent.com/${repo}/main/${path}`;
 }
@@ -147,7 +144,6 @@ ${body}
 
 // What wins a byte several rows claim: code, data, platform, decoded blobs, identified blobs; then unknown.
 const RANK = { code: 0, data: 1, platform: 2, decoded: 3, identified: 4 };
-const LAYER_OF = { code: 'code', data: 'data', platform: 'platform', blobs: 'blobs' };
 
 function span(rows, what, romSize) {
   if (!Array.isArray(rows)) throw new TypeError(`progress.json: map.${what} is not a list`);
@@ -229,68 +225,46 @@ export function state(percent) {
   return percent >= 100 ? 'exact' : percent > 0 ? 'fuzzy' : 'none';
 }
 
-// The layers to show from the stored text; anything unreadable shows all five.
-export function parseLayers(text) {
-  try {
-    const list = JSON.parse(text);
-    if (Array.isArray(list) && list.every((name) => LAYERS.includes(name))) return new Set(list);
-  } catch {
-    // Not stored yet, or not JSON: the default below.
-  }
-  return new Set(LAYERS);
+// The key: one scale of match for code, 0 % at the left end and 100 % at the right.
+export function legend() {
+  return '<div class="legend"><div class="scale"><i class="none"></i><i class="fuzzy"></i><i class="exact"></i><span>0 %</span><span>100 %</span></div></div>';
 }
 
-// The key: one checkbox per layer, one scale of match for code (0 % left, 100 % right) and the blob shades.
-export function legend(shown = new Set(LAYERS)) {
-  const boxes = LAYERS.map((name) => `<label><input type="checkbox" data-layer="${name}"${shown.has(name) ? ' checked' : ''}> ${name}</label>`).join('');
-  return `<div class="legend"><div class="layers">${boxes}</div><div class="scale"><i class="none"></i><i class="fuzzy"></i><i class="exact"></i><span>0 %</span><span>100 %</span></div><div class="key"><span><i class="blob identified"></i>identified</span><span><i class="blob decoded"></i>decoded</span></div></div>`;
-}
-
-const layerOf = (model, f) => (f < 0 ? 'unknown' : LAYER_OF[model.items[f].kind]);
-
-// ROM memory map: one row per 16 KiB, each piece a slice as wide as its bytes. Code is colored by its state (exact, none,
-// or a ramp for fuzzy), data, platform and blobs by their own colors, unknown is the empty track. Only the shown layers
-// are drawn and a row with nothing to draw is dropped.
-export function mapHtml(model, shown = new Set(LAYERS)) {
+// ROM memory map: one row per 16 KiB, each function a slice as wide as its bytes, colored by its state: exact, none, or a
+// ramp for fuzzy. Only code is drawn; data, platform, blobs and unknown bytes stay off the map, and a row without code is dropped.
+export function mapHtml(model) {
   const { items, rows } = model;
   const lines = rows
     .map((row) => {
       const slices = row.slices
-        .filter(({ f }) => shown.has(layerOf(model, f)))
+        .filter(({ f }) => f >= 0 && items[f].kind === 'code')
         .map(({ f, left, width }) => {
-          const place = `left:${share(left)};width:${share(width)}`;
-          const sep = width >= SEPARATED ? ' s' : '';
-          if (f < 0) return `<i class="unknown${sep}" style="${place}"></i>`;
-          const item = items[f];
-          if (item.kind === 'code') {
-            const kind = state(item.percent);
-            return `<i class="${kind}${sep}" data-f="${f}" style="${place}${kind === 'fuzzy' ? `;--p:${item.percent}%` : ''}"></i>`;
-          }
-          return `<i class="${item.kind === 'blobs' ? `blob ${item.state}` : item.kind}${sep}" data-f="${f}" style="${place}"></i>`;
+          const { percent } = items[f];
+          const kind = state(percent);
+          return `<i class="${kind}${width >= SEPARATED ? ' s' : ''}" data-f="${f}" style="left:${share(left)};width:${share(width)}${kind === 'fuzzy' ? `;--p:${percent}%` : ''}"></i>`;
         });
       return slices.length ? `<div class="row"><span class="off">${hex(row.offset)}</span><span class="track">${slices.join('')}</span></div>` : '';
     })
     .filter(Boolean)
     .join('\n');
-  return `<div class="map" aria-label="memory map: arrow keys move between pieces, enter or a tap opens its details">${lines}<b class="cross" hidden></b></div>`;
+  return `<div class="map" aria-label="memory map: arrow keys move between functions, enter or a tap opens its details">${lines}<b class="cross" hidden></b></div>`;
 }
 
-// The compact per-item data the map script reads: [name, file index or -1, percent or null, size, ROM offset, line, words or null,
-// kind, blob [state, type] or null].
+// The compact per-function data the map script reads: [name, file index or -1, percent, size, ROM offset, line, words or null].
 export function mapData(model, repo) {
   const units = [...new Set(model.items.map((item) => item.path).filter(Boolean))];
   const index = new Map(units.map((unit, i) => [unit, i]));
   return {
     repo,
     units,
-    fns: model.items.map((item) => [item.name, item.path ? index.get(item.path) : -1, item.kind === 'code' ? item.percent : null, item.size, item.rom, item.line || 0, null, item.kind, item.kind === 'blobs' ? [item.state, item.type] : null]),
+    fns: model.items.map((item) => [item.name, item.path ? index.get(item.path) : -1, item.kind === 'code' ? item.percent : null, item.size, item.rom, item.line || 0, null]),
   };
 }
 
-export function figureInner(model, repo, shown = new Set(LAYERS)) {
+export function figureInner(model, repo) {
   return `<p class="readout" hidden></p>
 <script type="application/json" class="map-data">${JSON.stringify(mapData(model, repo)).replace(/</g, '\\u003c')}</script>
-${mapHtml(model, shown)}${legend(shown)}`;
+${mapHtml(model)}${legend()}`;
 }
 
 export function sourceUrl(repo, path, line) {

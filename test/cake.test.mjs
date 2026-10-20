@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LAYERS, state, detailHtml, figureInner, functionLines, highlightC, legend, sourceUrl, mapData, mapHtml, parseLayers, parseMap, parseProgress, regionCode, sourceUrls, specRows, versionTable } from '../assets/js/cake.js';
+import { state, detailHtml, figureInner, functionLines, highlightC, legend, sourceUrl, mapData, mapHtml, parseMap, parseProgress, regionCode, sourceUrls, specRows, versionTable } from '../assets/js/cake.js';
 import { progress, progressTwo } from './fixtures.mjs';
 
 const layerBytes = (model, kind) => model.rows.flatMap((r) => r.slices)
@@ -81,64 +81,38 @@ test('parseMap refuses malformed input instead of drawing a wrong map', () => {
   assert.throws(() => parseMap({ ...progress.map, spans: {} }), /spans.data is not a list/);
 });
 
-test('mapHtml draws every layer by default: heat for code, own colors for data, platform and blobs, an empty track for unknown', () => {
+test('mapHtml draws code only: heat per function, no data, platform, blob or unknown slice, and a row without code is dropped', () => {
   const model = parseMap(progress.map);
   const html = mapHtml(model);
-  assert.match(html, /<div class="row"><span class="off">0x000000<\/span><span class="track"><i class="platform s" data-f="0" style="left:0%;width:25%"><\/i><i class="exact s" data-f="1" style="left:25%;width:1.563%"><\/i><i class="data s" data-f="2" style="left:26.563%;width:1.563%"><\/i><i class="unknown s" style="left:28.125%;width:70.313%"><\/i><i class="fuzzy s" data-f="3" style="left:98.438%;width:1.563%;--p:87.5%"><\/i>/);
-  assert.match(html, /<i class="blob decoded s" data-f="4" style="left:0%;width:25%"><\/i>/);
-  assert.match(html, /<i class="blob identified" data-f="6" style="left:0%;width:0.391%"><\/i><i class="none" data-f="7" style="left:0.391%;width:0.391%"><\/i>/);
-  assert.equal((html.match(/<div class="row">/g) || []).length, 8);
+  const rows = [...html.matchAll(/<span class="off">(0x[0-9A-F]+)<\/span>/g)].map((m) => m[1]);
+  assert.deepEqual(rows, ['0x000000', '0x004000', '0x00C000']);
+  assert.match(html, /<div class="row"><span class="off">0x000000<\/span><span class="track"><i class="exact s" data-f="1" style="left:25%;width:1.563%"><\/i><i class="fuzzy s" data-f="3" style="left:98.438%;width:1.563%;--p:87.5%"><\/i>/);
+  assert.match(html, /<i class="none" data-f="7" style="left:0.391%;width:0.391%"><\/i>/);
+  assert.doesNotMatch(html, /unknown|blob|data s|platform/);
 });
 
-test('layer filtering draws only the shown layers and drops a row with nothing to draw', () => {
-  const model = parseMap(progress.map);
-  const only = (...names) => mapHtml(model, new Set(names));
-  const rows = (html) => [...html.matchAll(/<span class="off">(0x[0-9A-F]+)<\/span>/g)].map((m) => m[1]);
-  assert.deepEqual(rows(only('code')), ['0x000000', '0x004000', '0x00C000']);
-  assert.doesNotMatch(only('code'), /unknown|blob|data s|platform/);
-  assert.deepEqual(rows(only('blobs')), ['0x008000', '0x00C000']);
-  assert.deepEqual(rows(only('platform')), ['0x000000']);
-  assert.deepEqual(rows(only('data')), ['0x000000']);
-  assert.equal(rows(only('unknown')).length, 8);
-  assert.equal(rows(only()).length, 0);
-  assert.equal(mapHtml(model, new Set(LAYERS)), mapHtml(model));
-});
-
-test('mapData indexes files and lines for functions and carries the kind and blob state of every item', () => {
+test('mapData indexes files and lines for functions', () => {
   const model = parseMap(progress.map);
   const data = mapData(model, 'Org/game-one');
   assert.deepEqual(data.units, ['src/a.c']);
-  assert.deepEqual(data.fns[1], ['func_80000400', 0, 100, 256, 0x1000, 3, null, 'code', null]);
-  assert.deepEqual(data.fns[4], ['tex_a', -1, null, 4096, 0x8000, 0, null, 'blobs', ['decoded', 'texture']]);
-  assert.deepEqual(data.fns[0], ['platform', -1, null, 0x1000, 0, 0, null, 'platform', null]);
+  assert.deepEqual(data.fns[1], ['func_80000400', 0, 100, 256, 0x1000, 3, null]);
   assert.match(figureInner(model, 'Org/game-one'), /^<p class="readout" hidden><\/p>\n<script type="application\/json" class="map-data">/);
 });
 
-test('the legend has one checked checkbox per layer, only the shown ones checked, and the blob key', () => {
-  const all = legend();
-  assert.deepEqual([...all.matchAll(/data-layer="(\w+)" checked/g)].map((m) => m[1]), ['code', 'data', 'blobs', 'platform', 'unknown']);
-  assert.match(all, /<label><input type="checkbox" data-layer="code" checked> code<\/label>/);
-  assert.match(all, /<i class="blob identified"><\/i>identified<\/span><span><i class="blob decoded"><\/i>decoded/);
-  assert.deepEqual([...legend(new Set(['blobs'])).matchAll(/data-layer="(\w+)" checked/g)].map((m) => m[1]), ['blobs']);
+test('the legend is one 0 % to 100 % scale with no layer checkboxes or blob key', () => {
+  const html = legend();
+  assert.match(html, /<i class="none"><\/i><i class="fuzzy"><\/i><i class="exact"><\/i><span>0 %<\/span><span>100 %<\/span>/);
+  assert.doesNotMatch(html, /checkbox|blob/);
 });
 
-test('parseLayers reads the stored layers and falls back to all five', () => {
-  assert.deepEqual([...parseLayers(null)], LAYERS);
-  assert.deepEqual([...parseLayers('{')], LAYERS);
-  assert.deepEqual([...parseLayers('["code","tex"]')], LAYERS);
-  assert.deepEqual([...parseLayers('["platform","code"]')].sort(), ['code', 'platform']);
-  assert.deepEqual([...parseLayers('[]')], []);
-});
-
-test('a game without blobs still renders all five layers', () => {
+test('a game without blobs still parses its numbers and draws only code on the map', () => {
   const [cart] = parseProgress(progressTwo, ['us']);
   assert.deepEqual([cart.blobs.total, cart.platform, cart.unknown], [0, 4096, 61184]);
   const model = parseMap(progressTwo.map);
   assert.equal(model.rows.length, 4);
-  assert.deepEqual(['code', 'data', 'platform', 'unknown'].map((k) => Math.round(layerBytes(model, k))), [192, 64, 4096, 61184]);
   const html = mapHtml(model);
-  for (const cls of ['exact', 'none', 'data', 'platform', 'unknown']) assert.match(html, new RegExp(`<i class="${cls}[ "]`));
-  assert.doesNotMatch(html, /class="blob/);
+  for (const cls of ['exact', 'none']) assert.match(html, new RegExp(`<i class="${cls}[ "]`));
+  assert.doesNotMatch(html, /class="(blob|data|platform|unknown)/);
 });
 
 const code = `int other(void) { return 1; }
