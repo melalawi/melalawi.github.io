@@ -67,13 +67,16 @@ function contactForm(contact) {
 </form>`;
 }
 
-// One ROM: its heading, named by the cartridge ID read from the repo, and an empty frame. The page script fills the numbers from the repo's progress.json and,
-// once the figure nears the screen, the memory map from its published SVG and symbols.json.
+// One ROM: its heading, named by the cartridge ID of the default version read from the repo, and an empty frame. The page
+// script fills the version tabs, the numbers and, once the figure nears the screen, the memory map from the repo's progress.json.
 function romSection(game, cart) {
   return `<section class="rom" data-repo="${escapeHtml(game.repo)}" data-version="${escapeHtml(game.default)}" data-versions="${escapeHtml(game.versions.join(' '))}">
 <h2 id="${slugify(cart)}"><a href="${escapeHtml(game.wiki)}">${escapeHtml(cart)}</a></h2>
+<div class="tabs-slot"></div>
+<div class="panel">
 <div class="numbers"><p class="status">loading…</p></div>
 <figure class="figure" data-map><p class="status">loading…</p></figure>
+</div>
 </section>`;
 }
 
@@ -119,6 +122,10 @@ ${site.games.map((game) => romSection(game, cartridges[game.id])).join('\n')}
 <dl class="spec"></dl>
 <div class="fn-body"></div>
 <p class="modal-actions"><button type="button" class="step" data-step="-1" aria-label="previous function">‹ prev</button><button type="button" class="step" data-step="1" aria-label="next function">next ›</button><a class="fn-source" target="_blank" rel="noopener">source</a></p>
+</dialog>
+<dialog class="modal" id="rom-header" aria-labelledby="rom-header-title">
+<div class="modal-head"><h2 id="rom-header-title">rom header</h2>${CLOSE}</div>
+<dl class="spec"></dl>
 </dialog>
 <script type="module" src="/js/map.js"></script>`),
   );

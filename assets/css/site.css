@@ -317,7 +317,7 @@ a {
   border-radius: 0;
 }
 
-/* Cake Unbake: spec rows, version lines and the ROM memory map */
+/* Cake Unbake: version tabs, ROM breakdown, spec rows and the ROM memory map */
 .rom {
   display: flex;
   flex-direction: column;
@@ -555,57 +555,140 @@ a {
   justify-self: end;
 }
 
-/* Version lines: one compact unwrapped row each. A narrow column stacks each version into three short lines
-   (version and cartridge, then counts with short labels), so the table never scrolls sideways. */
-.versions {
-  container-type: inline-size;
+/* Version tabs: one per ROM version, the cartridge ID over its version code; a narrow column scrolls the row itself. */
+.tabs {
+  position: relative;
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: calc(-1 * var(--space-2));
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--color-edge);
 }
 
-.versions .table th,
-.versions .table td {
-  padding: var(--space-1) var(--space-2);
+.tab {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1em;
+  padding: var(--space-2) var(--space-3) calc(var(--space-2) - 2px);
+  font: inherit;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
 }
 
-.versions .table th {
-  font-family: var(--font-family-text);
+.tab-id {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+}
+
+.tab-v {
+  font-size: var(--font-size-xs);
   font-style: italic;
 }
 
-@container (max-width: 52rem) {
-  .versions thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-
-  .versions tr {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 var(--space-3);
-    padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--color-edge);
-  }
-
-  .versions .table td {
-    padding: 0;
-    text-align: left;
-    border: 0;
-  }
-
-
-  .versions td:nth-child(2) {
-    flex-basis: 100%;
-  }
-
-  .versions td[data-label]::before {
-    content: attr(data-label) ' ';
-    font-family: var(--font-family-text);
-    font-style: italic;
-    color: var(--color-text-muted);
-  }
+.tab:hover {
+  color: var(--color-text);
 }
+
+.tab[aria-selected='true'] {
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ROM breakdown: the header block at offset 0, then one bar of the ROM's bytes by class. */
+.breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: var(--measure);
+}
+
+.breakdown .bar {
+  display: flex;
+  gap: 2px;
+  height: 2rem;
+}
+
+.parts {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.parts i {
+  display: block;
+  height: 100%;
+}
+
+.header-block {
+  flex: 0 0 auto;
+  padding: 0 var(--space-2);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-on-accent);
+  cursor: pointer;
+  background: var(--color-accent);
+  border: 0;
+}
+
+.header-block:hover {
+  background: var(--color-accent-press);
+}
+
+.header-block:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.parts-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.parts-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  white-space: nowrap;
+}
+
+.parts-key i {
+  width: 0.7em;
+  height: 0.7em;
+}
+
+.parts-key b {
+  font-family: var(--font-family-mono);
+  font-weight: 400;
+  color: var(--color-text);
+}
+
+.part-code { background: var(--heat-exact); }
+.part-data { background: var(--heat-fuzzy-high); }
+.part-platform { background: var(--color-text-muted); }
+.part-blobs { background: var(--heat-fuzzy-low); }
+.part-unknown { background: var(--heat-none); }
 
 /* Archive */
 .archive {
@@ -753,4 +836,8 @@ a {
   .modal {
     padding: var(--space-3);
   }
+}
+
+#rom-header .spec dt {
+  flex-basis: 8rem;
 }

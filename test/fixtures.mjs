@@ -1,5 +1,5 @@
 // Two published repos in progress.json schema 2, built to the unbake report fields (code/data/functions rows, blobs,
-// platform, unknown) and one map for the default version. Every byte of the ROM is one class: they sum to rom_size.
+// platform, unknown, the parsed cartridge header) and one map per version (game one; game two is an older file with one `map`). Every byte of the ROM is one class: they sum to rom_size.
 //
 // Game one, us, ROM 0x20000 (131,072 B):
 //   0x0000-0x1000 platform (4,096)        0x1000-0x1100 func_80000400, exact (256)     0x1100-0x1200 data (256)
@@ -19,9 +19,13 @@ export const progress = {
       code: { matched: 256, fuzzy: 448, total: 832 }, data: { matched: 256, fuzzy: 0, total: 256 }, functions: { matched: 1234, fuzzy: 1, total: 3 },
       blobs: { decoded: 4096, identified: 2112, total: 6208, by_type: { model: { identified: 1 }, sound: { identified: 1 }, texture: { decoded: 1, observed: 1 } } },
       platform: 4096, unknown: 119680,
+      header: {
+        pi: { release: 3, page_size: 7, pulse_width: 0x12, latency: 0x40 }, clock_rate: 15, entry_point: 0x80000400, release: '2.0K',
+        crc1: 0x12345678, crc2: 0x9abcdef0, name: 'Example Game', game_id: 'NXXE', country: 'North America', version: 1,
+      },
     },
   ],
-  map: {
+  maps: [{
     version: 'us',
     rom_size: 131072,
     fns: [
@@ -36,7 +40,13 @@ export const progress = {
       ['over', 0xc000, 128, 'identified', 'model'],
     ],
     spans: { data: [[0x1100, 0x1200]], platform: [[0, 0x1000]] },
-  },
+  }, {
+    version: 'eu',
+    rom_size: 65536,
+    fns: [['func_80000400', 0x1000, 256, 100, 'src/a.c', 3]],
+    blobs: [],
+    spans: { data: [], platform: [[0, 0x1000]] },
+  }],
 };
 
 // Game two has no blob evidence: its blobs row is 0 of 0 and the rest of the ROM is unknown.

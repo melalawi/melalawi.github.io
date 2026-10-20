@@ -1,11 +1,15 @@
 // Cake unbake data and markup for the page script, which fetches each repo's published progress.json from main on every
 // visit. Pure: no DOM, no fetch, so the tests run it in node.
 //   progress.json   {schema:2, carts:[{id, version, rom_size, code:{matched,fuzzy,total}, data:{matched,fuzzy,total},
-//                     functions:{matched,fuzzy,total}, blobs:{decoded,identified,total,by_type}, platform, unknown}],
-//                    map:{version, rom_size, fns:[[name, rom, size, percent, path, line]],
-//                         blobs:[[id, rom, size, state, type]], spans:{data:[[from,to]], platform:[[from,to]]}}}
-//                   Every byte of the ROM is one of code, data, platform, blobs or unknown: their sum is rom_size. `map` is
-//                   only for the version the page shows. percent: fuzzy percent 0..100. Blobs in state `observed` are
+//                     functions:{matched,fuzzy,total}, blobs:{decoded,identified,total,by_type}, platform, unknown,
+//                     header?:{pi:{release,page_size,pulse_width,latency}, clock_rate, entry_point, release, crc1, crc2,
+//                              name, game_id, country, version}}],
+//                    maps:[{version, rom_size, fns:[[name, rom, size, percent, path, line]],
+//                         blobs:[[id, rom, size, state, type]], spans:{data:[[from,to]], platform:[[from,to]]}}]}
+//                   Every byte of the ROM is one of code, data, platform, blobs or unknown: their sum is rom_size. `maps`
+//                   has one map per version; an older file has one `map` for one version instead. `header` is the parsed
+//                   cartridge header (fields, never bytes); a cart without it shows no header block.
+//                   percent: fuzzy percent 0..100. Blobs in state `observed` are
 //                   not drawn, their bytes are unknown. Anything but schema 2 is rejected.
 //   <path>          the C file at main; a function's source is its text from `line` to its closing brace
 
@@ -74,12 +78,39 @@ export function parseProgress(progress, versions) {
       platform,
       unknown,
       romSize,
+      header: cart.header === undefined ? null : header(cart.header, cart.version),
     });
   }
   return versions.map((version) => {
     if (!byVersion.has(version)) throw new Error(`progress.json has no cart for ${version}`);
     return byVersion.get(version);
   });
+}
+
+// The header fields of a cart, checked: integers in range and strings, nothing else used.
+function header(row, version) {
+  const what = `${version} header`;
+  if (!row || typeof row !== 'object' || !row.pi || typeof row.pi !== 'object') throw new TypeError(`progress.json: ${what} is malformed`);
+  const u32 = (value, field) => {
+    if (whole(value, `${what}.${field}`) > 0xffffffff) throw new TypeError(`progress.json: ${what}.${field} is not 32 bits`);
+    return value;
+  };
+  const text = (value, field) => {
+    if (typeof value !== 'string') throw new TypeError(`progress.json: ${what}.${field} is not text`);
+    return value;
+  };
+  return {
+    pi: { release: whole(row.pi.release, `${what}.pi.release`), page_size: whole(row.pi.page_size, `${what}.pi.page_size`), pulse_width: whole(row.pi.pulse_width, `${what}.pi.pulse_width`), latency: whole(row.pi.latency, `${what}.pi.latency`) },
+    clock_rate: u32(row.clock_rate, 'clock_rate'),
+    entry_point: u32(row.entry_point, 'entry_point'),
+    release: text(row.release, 'release'),
+    crc1: u32(row.crc1, 'crc1'),
+    crc2: u32(row.crc2, 'crc2'),
+    name: text(row.name, 'name'),
+    game_id: text(row.game_id, 'game_id'),
+    country: text(row.country, 'country'),
+    version: whole(row.version, `${what}.version`),
+  };
 }
 
 // Short region code of a version: the version code up to its first dash (us-rev1 -> us, eu-x -> eu).
@@ -94,52 +125,91 @@ export function blobTypes(types) {
     .join(' · ');
 }
 
-export function specRows(cart, versions) {
+export function specRows(cart) {
   const census = blobTypes(cart.blobs.types);
+  const bytes = (value) => `${n(value)} bytes`;
   return [
     ['cartridge', cart.id],
     ['region', regionCode(cart.version)],
     ['revision', String(cart.revision)],
-    ['versions', versions.join(', ')],
     ['matched fn', `${n(cart.fn)} / ${n(cart.fnTotal)}`],
     ['% .text', `${cart.text.toFixed(2)} %`],
-    ['code bytes', `${n(cart.code.matched)} / ${n(cart.code.total)} B`],
-    ['fuzzy bytes', `${n(cart.code.fuzzy)} B`],
-    ['data bytes', `${n(cart.data.matched)} / ${n(cart.data.total)} B`],
-    ['blobs bytes', `${n(cart.blobs.decoded)} decoded + ${n(cart.blobs.identified)} identified B`],
+    ['code', `${n(cart.code.matched)} / ${bytes(cart.code.total)}`],
+    ['fuzzy code', bytes(cart.code.fuzzy)],
+    ['data', `${n(cart.data.matched)} / ${bytes(cart.data.total)}`],
+    ['blobs', `${n(cart.blobs.decoded)} decoded + ${n(cart.blobs.identified)} identified bytes`],
     ...(census ? [['blob types', census]] : []),
-    ['platform bytes', `${n(cart.platform)} B`],
-    ['unknown bytes', `${n(cart.unknown)} B`],
-    ['rom', `${n(cart.romSize)} B`],
+    ['platform', bytes(cart.platform)],
+    ['unknown', bytes(cart.unknown)],
+    ['rom', bytes(cart.romSize)],
   ];
 }
 
-export function specHtml(cart, versions, repo) {
-  const rows = specRows(cart, versions).map(([k, v]) => `<div><dt>${k}</dt><dd>${e(v)}</dd></div>`).join('');
-  return `<dl class="spec">${rows}<div><a href="https://github.com/${e(repo)}">source</a></div></dl>`;
+export function specHtml(cart) {
+  const rows = specRows(cart).map(([k, v]) => `<div><dt>${k}</dt><dd>${e(v)}</dd></div>`).join('');
+  return `<dl class="spec">${rows}</dl>`;
 }
 
-// One line per ROM version: version code, cartridge (its code carries region and revision) and the counts. Fuzzy, platform and
-// the blob decoded/identified split are on the spec rows; blobs B here is decoded of all blob bytes.
-// data-label is the short label a narrow column shows beside each value once the header row is hidden.
-export function versionTable(carts) {
-  const cell = (label, value) => `<td data-label="${label}">${value}</td>`;
-  const body = carts
-    .map((c) => `<tr><td>${e(c.version)}</td><td>${e(c.id)}</td>${[
-      cell('fn', `${n(c.fn)}/${n(c.fnTotal)}`),
-      cell('.text', pct(c.text)),
-      cell('code B', `${n(c.code.matched)}/${n(c.code.total)}`),
-      cell('data B', `${n(c.data.matched)}/${n(c.data.total)}`),
-      cell('blobs B', `${n(c.blobs.decoded)}/${n(c.blobs.total)}`),
-      cell('unknown B', n(c.unknown)),
-    ].join('')}</tr>`)
-    .join('\n');
-  return `<div class="versions"><table class="table">
-<thead><tr><th>version</th><th>cartridge</th><th>matched fn</th><th>% .text</th><th>code B</th><th>data B</th><th>blobs B</th><th>unknown B</th></tr></thead>
-<tbody>
-${body}
-</tbody>
-</table></div>`;
+// One tab per version, labelled by its cartridge ID with the version code under it; `selected` is the version shown.
+// Roving tabindex: only the selected tab is in the tab order, the arrow keys move between tabs.
+export function tabsHtml(carts, selected, key) {
+  const tabs = carts
+    .map((c) => {
+      const on = c.version === selected;
+      return `<button type="button" role="tab" class="tab" id="tab-${e(key)}-${e(c.version)}" data-version="${e(c.version)}" aria-selected="${on}" aria-controls="panel-${e(key)}" tabindex="${on ? 0 : -1}"><span class="tab-id">${e(c.id)}</span><span class="tab-v">${e(c.version)}</span></button>`;
+    })
+    .join('');
+  return `<div class="tabs" role="tablist" aria-label="rom version">${tabs}</div>`;
+}
+
+// The ROM breakdown: the cartridge header as its own block at offset 0 (a button that opens its fields, when the cart
+// has them), then one bar of the ROM's bytes by class, each part as wide as its share.
+export const PARTS = [
+  ['code', (c) => c.code.total],
+  ['data', (c) => c.data.total],
+  ['platform', (c) => c.platform],
+  ['blobs', (c) => c.blobs.total],
+  ['unknown', (c) => c.unknown],
+];
+
+// A part's share of the ROM to one decimal; a part too small to show one is "< 0.1 %".
+export function percentOf(size, total) {
+  const value = (size / total) * 100;
+  return value > 0 && value < 0.05 ? '< 0.1 %' : `${value.toFixed(1)} %`;
+}
+
+export function breakdownHtml(cart) {
+  const parts = PARTS.map(([name, size]) => [name, size(cart)]).filter(([, size]) => size > 0);
+  const bar = parts.map(([name, size]) => `<i class="part-${name}" style="width:${share(size / cart.romSize)}" title="${name} ${n(size)} bytes"></i>`).join('');
+  const key = parts.map(([name, size]) => `<span><i class="part-${name}"></i>${name} <b>${percentOf(size, cart.romSize)}</b></span>`).join('');
+  const head = cart.header ? '<button type="button" class="header-block" aria-haspopup="dialog" title="rom header: open its fields">header</button>' : '';
+  return `<div class="breakdown"><div class="bar">${head}<span class="parts">${bar}</span></div><p class="parts-key">${key}</p></div>`;
+}
+
+const hex8 = (value) => hex(value, 8);
+const hex2 = (value) => hex(value, 2);
+
+// The parsed cartridge header fields of progress.json as dialog rows. Fields only: the page never sees header bytes.
+export function headerRows(header) {
+  const { pi } = header;
+  return [
+    ['internal name', header.name],
+    ['game id', header.game_id],
+    ['country', header.country],
+    ['version', String(header.version)],
+    ['release', header.release ? `libultra ${header.release}` : 'unknown'],
+    ['entry point', hex8(header.entry_point)],
+    ['clock rate', hex8(header.clock_rate)],
+    ['pi settings', `latency ${hex2(pi.latency)} · pulse width ${hex2(pi.pulse_width)} · page size ${pi.page_size} · release ${pi.release}`],
+    ['crc1', hex8(header.crc1)],
+    ['crc2', hex8(header.crc2)],
+  ];
+}
+
+// The map of one version: `maps` (one per version), else the single `map` when it is that version's; null without one.
+export function mapOf(progress, version) {
+  const maps = Array.isArray(progress.maps) ? progress.maps : progress.map ? [progress.map] : [];
+  return maps.find((m) => m && m.version === version) || null;
 }
 
 // What wins a byte several rows claim: code, data, platform, decoded blobs, identified blobs; then unknown.

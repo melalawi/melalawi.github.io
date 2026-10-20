@@ -50,7 +50,8 @@ test('cake unbake builds a frame per ROM with no numbers, linked to the game art
   const main = html.split('<main')[1].split('<dialog')[0];
   assert.ok(!/class="(spec|versions|map|map-data)"/.test(main));
   assert.equal(main.replace(/<[^>]*>/g, ' ').replace(/NUS-[A-Z0-9-]+/g, '').match(/\d/), null);
-  assert.match(html, /<section class="rom" data-repo="Org\/game-one" data-version="us" data-versions="us eu">\n<h2 id="nus-nxxe-1"><a href="https:\/\/wiki\.test\/Game_One">NUS-NXXE-1<\/a><\/h2>\n<div class="numbers"><p class="status">loading…<\/p><\/div>\n<figure class="figure" data-map><p class="status">loading…<\/p><\/figure>\n<\/section>/);
+  assert.match(html, /<section class="rom" data-repo="Org\/game-one" data-version="us" data-versions="us eu">\n<h2 id="nus-nxxe-1"><a href="https:\/\/wiki\.test\/Game_One">NUS-NXXE-1<\/a><\/h2>\n<div class="tabs-slot"><\/div>\n<div class="panel">\n<div class="numbers"><p class="status">loading…<\/p><\/div>\n<figure class="figure" data-map><p class="status">loading…<\/p><\/figure>\n<\/div>\n<\/section>/);
+  assert.match(html, /<dialog class="modal" id="rom-header" aria-labelledby="rom-header-title">[\s\S]*<dl class="spec"><\/dl>\n<\/dialog>/);
   assert.match(html, /<script type="module" src="\/js\/map.js"><\/script>/);
 });
 

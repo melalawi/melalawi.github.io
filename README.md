@@ -25,7 +25,7 @@ The build writes `dist/`. The dev server binds every interface on port 4380 or t
 
 ## cake unbake
 
-The attic page cake unbake holds no numbers. In the browser each ROM section reads its repo's `progress.json` (schema 2) from main: the numbers for every version, and for the default version the memory map. Every ROM byte is one of code, data, platform, blobs or unknown, and the page rejects a file whose layers do not add up to `rom_size`; the map draws only the code, one slice per function, and leaves the other layers off. The last good copy of the file stays in the browser and shows when a fetch fails. At build time the cartridge ID is checked against the repo README's totals.
+The attic page cake unbake holds no numbers. In the browser each ROM section reads its repo's `progress.json` (schema 2) from main. A tab per version (the game's default from `site.json` first) shows that version's ROM breakdown, its numbers and its memory map (code only). Every ROM byte is one of code, data, platform, blobs or unknown, and the page rejects a file whose layers do not add up to `rom_size`. When a cart carries its parsed cartridge header, a header block leads the breakdown and opens those fields (never header bytes). The last good copy of the file stays in the browser and shows when a fetch fails. At build time the cartridge ID is checked against the repo README's totals.
 
 ## Deploy
 

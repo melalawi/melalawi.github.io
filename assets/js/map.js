@@ -1,5 +1,7 @@
-// Cake unbake: the built page has no numbers. Each ROM section reads its repo's progress.json (schema 2: the numbers and
-// the memory map) from main on every visit and draws the map once its figure nears the screen. The last good copy is
+// Cake unbake: the built page has no numbers. Each ROM section reads its repo's progress.json (schema 2: the numbers, the
+// cartridge header fields and a memory map per version) from main on every visit. A tab per version picks the one shown
+// (the site's default first): its ROM breakdown, whose header block opens the header fields, its numbers and its map,
+// drawn once the figure nears the screen. The last good copy is
 // kept in this browser and drawn first, so a failed or malformed fetch keeps the last numbers on screen; with no copy
 // yet the section says the numbers are unavailable.  Only code is drawn on the map.
 // ROM memory map: hover or keyboard focus shows one function in the readout, lights the other functions of its
@@ -7,7 +9,7 @@
 // the neighbouring functions, shows what the function does and its C, and
 // links its source line on GitHub. A tap between slices or on a row's offset
 // picks the nearest slice in the nearest row, so the thinnest functions are reachable on a phone.
-import { detailHtml, figureInner, functionLines, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, versionTable } from './cake.js';
+import { breakdownHtml, detailHtml, figureInner, functionLines, headerRows, mapOf, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, tabsHtml } from './cake.js';
 
 const steppers = new Map();
 const fnDialog = document.getElementById('fn');
@@ -67,40 +69,110 @@ const unavailable = (box, repo) => {
   box.innerHTML = `<p class="status">unavailable right now · <a href="https://github.com/${repo}">source</a></p>`;
 };
 
-// Per section: the progress.json document on screen and the map parsed from it (once its figure is near the screen).
+// Per section: the progress.json document on screen, its checked carts, and the map parsed from it (once its figure
+// is near the screen).
 const docs = new Map();
+const headerDialog = document.getElementById('rom-header');
 
 async function numbers(section) {
-  const { repo, version } = section.dataset;
+  const { repo } = section.dataset;
   const versions = section.dataset.versions.split(' ');
   const box = section.querySelector('.numbers');
   const end = await source(`cake:${repo}:progress`, () => fetched(sourceUrls(repo).progress), (text) => {
     const document_ = JSON.parse(text);
     const carts = parseProgress(document_, versions);
-    box.innerHTML = specHtml(carts[versions.indexOf(version)], versions, repo) + (versions.length > 1 ? versionTable(carts) : '');
-    docs.set(section, document_);
-    if (docs.get(`${section.dataset.key}:wanted`)) {
-      try {
-        redraw(section);
-      } catch {
-        unavailable(section.querySelector('.figure[data-map]'), repo);
-      }
-    }
+    docs.set(section, { document: document_, carts });
+    render(section);
   });
   if (end === 'none') unavailable(box, repo);
   return end;
 }
 
+// The selected version's tabs, breakdown and spec rows, then its map once the figure was near the screen.
+function render(section) {
+  const { repo, version, key } = section.dataset;
+  const { carts } = docs.get(section);
+  const cart = carts.find((c) => c.version === version);
+  const slot = section.querySelector('.tabs-slot');
+  const panel = section.querySelector('.panel');
+  panel.id = `panel-${key}`;
+  if (carts.length > 1) {
+    slot.innerHTML = tabsHtml(carts, version, key);
+    panel.setAttribute('role', 'tabpanel');
+    panel.setAttribute('aria-labelledby', `tab-${key}-${version}`);
+    // A narrow row scrolls sideways: bring the selected tab into it without scrolling the page.
+    const row = slot.firstElementChild;
+    const tab = row.querySelector('[aria-selected="true"]');
+    if (tab.offsetLeft < row.scrollLeft || tab.offsetLeft + tab.offsetWidth > row.scrollLeft + row.clientWidth) {
+      row.scrollLeft = tab.offsetLeft - (row.clientWidth - tab.offsetWidth) / 2;
+    }
+  }
+  // The heading names the ROM shown: its internal name when the cart has header fields, else its cartridge ID.
+  const title = section.querySelector('h2 a');
+  if (title) title.textContent = cart.header && cart.header.name ? cart.header.name : cart.id;
+  section.querySelector('.numbers').innerHTML = breakdownHtml(cart) + specHtml(cart);
+  if (docs.get(`${key}:wanted`)) {
+    try {
+      redraw(section);
+    } catch {
+      section.querySelector('.figure[data-map]').innerHTML = '<p class="status">no map for this version yet</p>';
+    }
+  }
+}
+
+function select(section, version, focus) {
+  if (section.dataset.version === version) return;
+  section.dataset.version = version;
+  render(section);
+  if (focus) section.querySelector(`.tab[data-version="${CSS.escape(version)}"]`).focus();
+}
+
+function openHeader(section) {
+  const cart = docs.get(section).carts.find((c) => c.version === section.dataset.version);
+  if (!headerDialog || !cart.header) return;
+  headerDialog.querySelector('h2').textContent = `${cart.id} header`;
+  headerDialog.querySelector('dl').replaceChildren(
+    ...headerRows(cart.header).map(([k, v]) => {
+      const div = document.createElement('div');
+      const dt = document.createElement('dt');
+      const dd = document.createElement('dd');
+      dt.textContent = k;
+      dd.textContent = v;
+      div.append(dt, dd);
+      return div;
+    }),
+  );
+  headerDialog.showModal();
+}
+
+function wire(section) {
+  section.addEventListener('click', (event) => {
+    const tab = event.target.closest('.tab[data-version]');
+    if (tab) return select(section, tab.dataset.version, false);
+    if (event.target.closest('.header-block')) openHeader(section);
+  });
+  section.addEventListener('keydown', (event) => {
+    const tab = event.target.closest('.tab[data-version]');
+    if (!tab) return;
+    const tabs = [...section.querySelectorAll('.tab[data-version]')];
+    const at = tabs.indexOf(tab);
+    const to = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: tabs.length - 1 }[event.key];
+    if (to === undefined) return;
+    event.preventDefault();
+    select(section, tabs[(to + tabs.length) % tabs.length].dataset.version, true);
+  });
+}
+
 const parsed = new Map();
 
-// Draw the map of the section's document. Throws when the document has no usable map.
+// Draw the map of the selected version. Throws when the document has no usable map for it.
 function redraw(section) {
   const { repo, version } = section.dataset;
   const figure = section.querySelector('.figure[data-map]');
-  const map = docs.get(section).map;
-  if (!map || map.version !== version) throw new TypeError(`progress.json has no map for ${version}`);
-  if (parsed.get(section) !== map) parsed.set(section, { map, model: parseMap(map) });
-  const inner = figureInner(parsed.get(section).model, repo);
+  const map = mapOf(docs.get(section).document, version);
+  if (!map) throw new TypeError(`progress.json has no map for ${version}`);
+  if (!parsed.has(map)) parsed.set(map, parseMap(map));
+  const inner = figureInner(parsed.get(map), repo);
   if (fnDialog && fnDialog.open && fnDialog.dataset.map === section.dataset.key) return;
   figure.innerHTML = inner;
   bind(section);
@@ -114,7 +186,8 @@ async function memoryMap(section) {
     redraw(section);
     return 'live';
   } catch {
-    unavailable(figure, section.dataset.repo);
+    if (docs.has(section)) figure.innerHTML = '<p class="status">no map for this version yet</p>';
+    else unavailable(figure, section.dataset.repo);
     return 'none';
   }
 }
@@ -132,7 +205,10 @@ const near = 'IntersectionObserver' in window
     }
   : (el, run) => run();
 // Maps are watched once every section has its numbers, so the layout above each figure is settled.
-sections.forEach((section, i) => (section.dataset.key = String(i)));
+sections.forEach((section, i) => {
+  section.dataset.key = String(i);
+  wire(section);
+});
 Promise.all(sections.map(numbers)).then((ends) =>
   sections.forEach((section, i) =>
     near(section.querySelector('.figure[data-map]'), () => memoryMap(section).then((map) => (section.dataset.live = `${ends[i]} ${map}`))),
