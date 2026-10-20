@@ -691,14 +691,14 @@ a {
 .part-blobs { background: var(--heat-fuzzy-low); }
 
 /* The ROM's parts sit under it as a thin tree. */
-.spec > .sub dt::before {
+.spec > .branch dt::before {
   content: '├ ';
   font-family: var(--font-family-mono);
   font-style: normal;
   color: var(--color-edge-strong);
 }
 
-.spec > .sub.last dt::before {
+.spec > .branch.last dt::before {
   content: '└ ';
 }
 

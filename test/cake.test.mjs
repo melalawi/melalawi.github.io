@@ -45,7 +45,7 @@ test('spec rows: the ROM first, its parts under it, then functions; no fuzzy, un
     ['functions', '1,234 / 3', 0],
   ]);
   const html = specHtml(us);
-  assert.match(html, /^<dl class="spec"><div><dt>rom<\/dt>[\s\S]*<div class="sub"><dt>header<\/dt>[\s\S]*<div class="sub last"><dt>blobs<\/dt>[\s\S]*<div><dt>functions<\/dt>/);
+  assert.match(html, /^<dl class="spec"><div><dt>rom<\/dt>[\s\S]*<div class="branch"><dt>header<\/dt>[\s\S]*<div class="branch last"><dt>blobs<\/dt>[\s\S]*<div><dt>functions<\/dt>/);
   assert.doesNotMatch(html, /<a |source|fuzzy|unknown|platform|identified|texture/);
 });
 

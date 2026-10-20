@@ -124,7 +124,7 @@ export function specRows(cart) {
 }
 
 export function specHtml(cart) {
-  const rows = specRows(cart).map(([k, v, depth]) => `<div${depth ? ` class="sub${depth > 1 ? ' last' : ''}"` : ''}><dt>${k}</dt><dd>${e(v)}</dd></div>`).join('');
+  const rows = specRows(cart).map(([k, v, depth]) => `<div${depth ? ` class="branch${depth > 1 ? ' last' : ''}"` : ''}><dt>${k}</dt><dd>${e(v)}</dd></div>`).join('');
   return `<dl class="spec">${rows}</dl>`;
 }
 
