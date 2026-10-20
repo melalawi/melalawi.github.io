@@ -1,6 +1,6 @@
 // Cartridge IDs and the totals check for the cake unbake page, read from each repo's published files at build time.
 //   progress.json (schema 2)      the cart of each version: its ID and the counts the page shows
-//   README.md                     per version: "| <v> (<cartridge ID>, ...) |" over a block of code and function totals
+//   README.md                     per version: "| <v> (<cartridge ID>, ...) |" over its ROM tree: "├ code" and "functions" bars
 // A cartridge ID is taken from progress.json and must equal the README's. Every total the page shows must equal
 // the README's, or the build fails and names each mismatch.
 import { rawUrl } from '../assets/js/cake.js';
@@ -13,7 +13,7 @@ export function parseReadme(text) {
   const block = /\| ([\w-]+) \(([A-Z0-9-]+),[^\n]*\|\n\|---\|\n\| <pre>([\s\S]*?)<\/pre>/g;
   for (const [, version, id, body] of text.matchAll(block)) {
     const pair = (label) => {
-      const m = new RegExp(`<code>${label}\\s+\\[[^\\]]*\\]\\s+[\\d.]+%(?: \\(~[\\d.]+%\\))?\\s+([\\d,]+) of ([\\d,]+)`).exec(body);
+      const m = new RegExp(`<code>(?:[├└] )?${label}\\s+\\[[^\\]]*\\]\\s+[\\d.]+%\\s+([\\d,]+) of ([\\d,]+)`).exec(body);
       return m ? [count(m[1]), count(m[2])] : null;
     };
     entries.set(version, { id, code: pair('code'), functions: pair('functions') });

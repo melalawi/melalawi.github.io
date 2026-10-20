@@ -1,14 +1,14 @@
 // Cake unbake data and markup for the page script, which fetches each repo's published progress.json from main on every
 // visit. Pure: no DOM, no fetch, so the tests run it in node.
-//   progress.json   {schema:2, carts:[{id, version, rom_size, code:{matched,fuzzy,total}, data:{matched,fuzzy,total},
-//                     functions:{matched,fuzzy,total}, blobs:{decoded,identified,total,by_type}, platform, unknown,
-//                     header?:{pi:{release,page_size,pulse_width,latency}, clock_rate, entry_point, release, crc1, crc2,
-//                              name, game_id, country, version}}],
-//                    maps:[{version, rom_size, fns:[[name, rom, size, percent, path, line]],
-//                         blobs:[[id, rom, size, state, type]], spans:{data:[[from,to]], platform:[[from,to]]}}]}
-//                   Every byte of the ROM is one of code, data, platform, blobs or unknown: their sum is rom_size. `maps`
-//                   has one map per version; an older file has one `map` for one version instead. `header` is the parsed
-//                   cartridge header (fields, never bytes); a cart without it shows no header block.
+//   progress.json   {schema:2, carts:[{id, version, rom_size, code:{matched,total}, data:{matched,total},
+//                     blobs:{decoded,total}, header:{bytes, pi:{release,page_size,pulse_width,latency}, clock_rate,
+//                     entry_point, release, crc1, crc2, name, game_id, country, version}, functions:{matched,total}}]}
+//                   The parts (header block, code, data, blobs) never add up to more than rom_size; what they leave is
+//                   simply not covered. `header` is the header block's byte count (cartridge header and boot code)
+//                   and the parsed cartridge header fields, never bytes.
+//   docs/map-<version>.json   {schema:1, version, rom_size, fns:[[name, rom, size, percent, path, line]],
+//                   blobs:[[id, rom, size, state, type]], spans:{data:[[from,to]], platform:[[from,to]]}}
+//                   one per version, fetched when its tab is first shown.
 //                   percent: fuzzy percent 0..100. Blobs in state `observed` are
 //                   not drawn, their bytes are unknown. Anything but schema 2 is rejected.
 //   <path>          the C file at main; a function's source is its text from `line` to its closing brace
@@ -44,11 +44,11 @@ const whole = (value, what) => {
 };
 const bucket = (row, what) => {
   if (!row || typeof row !== 'object') throw new TypeError(`progress.json: ${what} is missing`);
-  return { matched: whole(row.matched, `${what}.matched`), fuzzy: whole(row.fuzzy, `${what}.fuzzy`), total: whole(row.total, `${what}.total`) };
+  return { matched: whole(row.matched, `${what}.matched`), total: whole(row.total, `${what}.total`) };
 };
 
-// The carts of progress.json by version code, checked, for the versions the page lists. The ROM's bytes must add up:
-// code + data + platform + blobs + unknown = rom_size, and blobs = decoded + identified.
+// The carts of progress.json by version code, checked, for the versions the page lists. The ROM's parts must fit in it:
+// header block + code + data + blobs never exceed rom_size, and decoded blobs never exceed their total.
 export function parseProgress(progress, versions) {
   if (!progress || progress.schema !== 2 || !Array.isArray(progress.carts)) throw new TypeError('progress.json is not schema 2');
   const byVersion = new Map();
@@ -58,27 +58,20 @@ export function parseProgress(progress, versions) {
     const functions = bucket(cart.functions, 'functions');
     const blobs = cart.blobs || {};
     const decoded = whole(blobs.decoded, 'blobs.decoded');
-    const identified = whole(blobs.identified, 'blobs.identified');
     const total = whole(blobs.total, 'blobs.total');
-    const platform = whole(cart.platform, 'platform');
-    const unknown = whole(cart.unknown, 'unknown');
     const romSize = whole(cart.rom_size, 'rom_size');
-    if (decoded + identified !== total) throw new TypeError(`progress.json: ${cart.version} blobs decoded + identified is not total`);
-    if (code.total + data.total + platform + total + unknown !== romSize) throw new TypeError(`progress.json: ${cart.version} bytes do not add up to rom_size`);
+    const head = header(cart.header, cart.version);
+    if (decoded > total) throw new TypeError(`progress.json: ${cart.version} blobs decoded is over total`);
+    if (code.total + data.total + total + head.bytes > romSize) throw new TypeError(`progress.json: ${cart.version} parts are over rom_size`);
     byVersion.set(cart.version, {
       version: String(cart.version),
       id: String(cart.id),
-      revision: Number((/-(\d+)$/.exec(cart.id) || [0, 0])[1]),
-      fn: functions.matched,
-      fnTotal: functions.total,
-      text: code.total ? (code.matched / code.total) * 100 : 0,
+      romSize,
       code,
       data,
-      blobs: { decoded, identified, total, types: blobs.by_type && typeof blobs.by_type === 'object' ? blobs.by_type : {} },
-      platform,
-      unknown,
-      romSize,
-      header: cart.header === undefined ? null : header(cart.header, cart.version),
+      blobs: { decoded, total },
+      header: head,
+      functions,
     });
   }
   return versions.map((version) => {
@@ -100,6 +93,7 @@ function header(row, version) {
     return value;
   };
   return {
+    bytes: whole(row.bytes, `${what}.bytes`),
     pi: { release: whole(row.pi.release, `${what}.pi.release`), page_size: whole(row.pi.page_size, `${what}.pi.page_size`), pulse_width: whole(row.pi.pulse_width, `${what}.pi.pulse_width`), latency: whole(row.pi.latency, `${what}.pi.latency`) },
     clock_rate: u32(row.clock_rate, 'clock_rate'),
     entry_point: u32(row.entry_point, 'entry_point'),
@@ -113,40 +107,24 @@ function header(row, version) {
   };
 }
 
-// Short region code of a version: the version code up to its first dash (us-rev1 -> us, eu-x -> eu).
-export function regionCode(version) {
-  return version.split('-')[0];
-}
-
-// The blob census as one line: blobs per type, every state counted ("texture 4 · sound 2").
-export function blobTypes(types) {
-  return Object.entries(types)
-    .map(([type, states]) => `${type} ${n(Object.values(states).reduce((a, b) => a + b, 0))}`)
-    .join(' · ');
-}
-
+// The numbers of one version: the ROM first (everything matched, decoded or the header block, of its size), its parts
+// under it (depth 1, the last one marked) and then the functions. What the parts do not cover is not a row.
 export function specRows(cart) {
-  const census = blobTypes(cart.blobs.types);
   const bytes = (value) => `${n(value)} bytes`;
+  const of = (matched, total) => `${n(matched)} / ${bytes(total)}`;
+  const sure = cart.code.matched + cart.data.matched + cart.blobs.decoded + cart.header.bytes;
   return [
-    ['cartridge', cart.id],
-    ['region', regionCode(cart.version)],
-    ['revision', String(cart.revision)],
-    ['matched fn', `${n(cart.fn)} / ${n(cart.fnTotal)}`],
-    ['% .text', `${cart.text.toFixed(2)} %`],
-    ['code', `${n(cart.code.matched)} / ${bytes(cart.code.total)}`],
-    ['fuzzy code', bytes(cart.code.fuzzy)],
-    ['data', `${n(cart.data.matched)} / ${bytes(cart.data.total)}`],
-    ['blobs', `${n(cart.blobs.decoded)} decoded + ${n(cart.blobs.identified)} identified bytes`],
-    ...(census ? [['blob types', census]] : []),
-    ['platform', bytes(cart.platform)],
-    ['unknown', bytes(cart.unknown)],
-    ['rom', bytes(cart.romSize)],
+    ['rom', of(sure, cart.romSize), 0],
+    ['header', bytes(cart.header.bytes), 1],
+    ['code', of(cart.code.matched, cart.code.total), 1],
+    ['data', of(cart.data.matched, cart.data.total), 1],
+    ['blobs', of(cart.blobs.decoded, cart.blobs.total), 2],
+    ['functions', `${n(cart.functions.matched)} / ${n(cart.functions.total)}`, 0],
   ];
 }
 
 export function specHtml(cart) {
-  const rows = specRows(cart).map(([k, v]) => `<div><dt>${k}</dt><dd>${e(v)}</dd></div>`).join('');
+  const rows = specRows(cart).map(([k, v, depth]) => `<div${depth ? ` class="sub${depth > 1 ? ' last' : ''}"` : ''}><dt>${k}</dt><dd>${e(v)}</dd></div>`).join('');
   return `<dl class="spec">${rows}</dl>`;
 }
 
@@ -162,14 +140,12 @@ export function tabsHtml(carts, selected, key) {
   return `<div class="tabs" role="tablist" aria-label="rom version">${tabs}</div>`;
 }
 
-// The ROM breakdown: the cartridge header as its own block at offset 0 (a button that opens its fields, when the cart
-// has them), then one bar of the ROM's bytes by class, each part as wide as its share.
+// The ROM breakdown: the header block at offset 0 (cartridge header and boot code, a button that opens the header's
+// fields), then code, data and blobs, each as wide as its share of the ROM. What they do not cover is the empty rest.
 export const PARTS = [
   ['code', (c) => c.code.total],
   ['data', (c) => c.data.total],
-  ['platform', (c) => c.platform],
   ['blobs', (c) => c.blobs.total],
-  ['unknown', (c) => c.unknown],
 ];
 
 // A part's share of the ROM to one decimal; a part too small to show one is "< 0.1 %".
@@ -182,7 +158,7 @@ export function breakdownHtml(cart) {
   const parts = PARTS.map(([name, size]) => [name, size(cart)]).filter(([, size]) => size > 0);
   const bar = parts.map(([name, size]) => `<i class="part-${name}" style="width:${share(size / cart.romSize)}" title="${name} ${n(size)} bytes"></i>`).join('');
   const key = parts.map(([name, size]) => `<span><i class="part-${name}"></i>${name} <b>${percentOf(size, cart.romSize)}</b></span>`).join('');
-  const head = cart.header ? '<button type="button" class="header-block" aria-haspopup="dialog" title="rom header: open its fields">header</button>' : '';
+  const head = '<button type="button" class="header-block" aria-haspopup="dialog" title="rom header: open its fields">header</button>';
   return `<div class="breakdown"><div class="bar">${head}<span class="parts">${bar}</span></div><p class="parts-key">${key}</p></div>`;
 }
 
@@ -193,6 +169,7 @@ const hex2 = (value) => hex(value, 2);
 export function headerRows(header) {
   const { pi } = header;
   return [
+    ['size', `${n(header.bytes)} bytes with the boot code`],
     ['internal name', header.name],
     ['game id', header.game_id],
     ['country', header.country],
@@ -206,20 +183,19 @@ export function headerRows(header) {
   ];
 }
 
-// The map of one version: `maps` (one per version), else the single `map` when it is that version's; null without one.
-export function mapOf(progress, version) {
-  const maps = Array.isArray(progress.maps) ? progress.maps : progress.map ? [progress.map] : [];
-  return maps.find((m) => m && m.version === version) || null;
+// The published map file of one version.
+export function mapUrl(repo, version) {
+  return rawUrl(repo, `docs/map-${version}.json`);
 }
 
 // What wins a byte several rows claim: code, data, platform, decoded blobs, identified blobs; then unknown.
 const RANK = { code: 0, data: 1, platform: 2, decoded: 3, identified: 4 };
 
 function span(rows, what, romSize) {
-  if (!Array.isArray(rows)) throw new TypeError(`progress.json: map.${what} is not a list`);
+  if (!Array.isArray(rows)) throw new TypeError(`map file: map.${what} is not a list`);
   return rows.map((row) => {
     const [from, to] = row;
-    if (whole(from, `map.${what} start`) > whole(to, `map.${what} end`) || to > romSize) throw new TypeError(`progress.json: map.${what} range is outside the ROM`);
+    if (whole(from, `map.${what} start`) > whole(to, `map.${what} end`) || to > romSize) throw new TypeError(`map file: map.${what} range is outside the ROM`);
     return { from, to };
   });
 }
@@ -251,24 +227,24 @@ function tile(items, romSize) {
   return pieces;
 }
 
-// The memory map of progress.json's `map` as items in ROM order (every function, data span, platform span and blob) and
+// The memory map of a version's map file as items in ROM order (every function, data span, platform span and blob) and
 // rows of 16 KiB with the pieces each shows. Items that another item outranks keep only the bytes they win; observed
 // blobs are left out (their bytes are unknown).
 export function parseMap(map) {
-  if (!map || typeof map !== 'object') throw new TypeError('progress.json has no map');
+  if (!map || typeof map !== 'object' || map.schema !== 1) throw new TypeError('map is not schema 1');
   const romSize = whole(map.rom_size, 'map.rom_size');
-  if (!romSize || !Array.isArray(map.fns) || !Array.isArray(map.blobs) || !map.spans) throw new TypeError('progress.json: map is malformed');
+  if (!romSize || !Array.isArray(map.fns) || !Array.isArray(map.blobs) || !map.spans) throw new TypeError('map file: map is malformed');
   const items = [];
   for (const row of map.fns) {
     const [name, rom, size, percent, path, line] = row;
-    if (typeof name !== 'string' || typeof percent !== 'number' || !(percent >= 0 && percent <= 100)) throw new TypeError(`progress.json: map function ${name}`);
-    if (whole(rom, `map ${name} rom`) + whole(size, `map ${name} size`) > romSize) throw new TypeError(`progress.json: map function ${name} is outside the ROM`);
+    if (typeof name !== 'string' || typeof percent !== 'number' || !(percent >= 0 && percent <= 100)) throw new TypeError(`map file: map function ${name}`);
+    if (whole(rom, `map ${name} rom`) + whole(size, `map ${name} size`) > romSize) throw new TypeError(`map file: map function ${name} is outside the ROM`);
     items.push({ kind: 'code', rank: 'code', name, rom, size, percent, path: path || null, line: path ? line || 0 : null });
   }
   for (const row of map.blobs) {
     const [id, rom, size, stateName, type] = row;
-    if (!['decoded', 'identified', 'observed'].includes(stateName)) throw new TypeError(`progress.json: map blob ${id} state`);
-    if (whole(rom, `map ${id} rom`) + whole(size, `map ${id} size`) > romSize) throw new TypeError(`progress.json: map blob ${id} is outside the ROM`);
+    if (!['decoded', 'identified', 'observed'].includes(stateName)) throw new TypeError(`map file: map blob ${id} state`);
+    if (whole(rom, `map ${id} rom`) + whole(size, `map ${id} size`) > romSize) throw new TypeError(`map file: map blob ${id} is outside the ROM`);
     if (stateName === 'observed') continue;
     items.push({ kind: 'blobs', rank: stateName, name: String(id), rom, size, state: stateName, type: String(type) });
   }

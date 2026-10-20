@@ -6,11 +6,11 @@ const readme = `<!-- progress -->
 
 | us (NUS-NXXE-1, North America). Revised. SHA256 \`abc\` |
 |---|
-| <pre><code>code      [█░░░]  50.00% (~60.00%)  1,000 of 2,000</code><br><code>data      [█░░░]  10.00%  1 of 10</code><br><code>functions [█░░░]  50.00% (~90.00%)  2 of 4</code></pre> |
+| <pre><code>rom         [█░░░]  40.00%  4,000 of 10,000 bytes</code><br><code>├ header    100</code><br><code>├ code      [█░░░]  50.00%  1,000 of 2,000</code><br><code>├ data      [█░░░]  10.00%  1 of 10</code><br><code>└ blobs     [█░░░]  10.00%  1 of 10</code><br><code>functions   [█░░░]  50.00%  2 of 4</code></pre> |
 `;
 const cart = { id: 'NUS-NXXE-1', version: 'us', functions: { matched: 2, total: 4 }, code: { matched: 1000, total: 2000 } };
 
-test('parseReadme reads the cartridge ID, code bytes and functions of each version', () => {
+test('parseReadme reads the cartridge ID, code bytes and functions of each version from its ROM tree', () => {
   assert.deepEqual([...parseReadme(readme)], [['us', { id: 'NUS-NXXE-1', code: [1000, 2000], functions: [2, 4] }]]);
 });
 

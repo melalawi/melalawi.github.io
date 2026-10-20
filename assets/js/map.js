@@ -1,7 +1,7 @@
-// Cake unbake: the built page has no numbers. Each ROM section reads its repo's progress.json (schema 2: the numbers, the
-// cartridge header fields and a memory map per version) from main on every visit. A tab per version picks the one shown
-// (the site's default first): its ROM breakdown, whose header block opens the header fields, its numbers and its map,
-// drawn once the figure nears the screen. The last good copy is
+// Cake unbake: the built page has no numbers. Each ROM section reads its repo's progress.json (schema 2: the numbers and
+// the cartridge header fields per version) from main on every visit. A tab per version picks the one shown (the site's
+// default first): its ROM breakdown, whose header block opens the header fields, its numbers and its memory map, read
+// from that version's docs/map-<version>.json once the figure nears the screen and then kept for the visit. The last good copy is
 // kept in this browser and drawn first, so a failed or malformed fetch keeps the last numbers on screen; with no copy
 // yet the section says the numbers are unavailable.  Only code is drawn on the map.
 // ROM memory map: hover or keyboard focus shows one function in the readout, lights the other functions of its
@@ -9,7 +9,7 @@
 // the neighbouring functions, shows what the function does and its C, and
 // links its source line on GitHub. A tap between slices or on a row's offset
 // picks the nearest slice in the nearest row, so the thinnest functions are reachable on a phone.
-import { breakdownHtml, detailHtml, figureInner, functionLines, headerRows, mapOf, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, tabsHtml } from './cake.js';
+import { breakdownHtml, detailHtml, figureInner, functionLines, headerRows, mapUrl, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, tabsHtml } from './cake.js';
 
 const steppers = new Map();
 const fnDialog = document.getElementById('fn');
@@ -69,8 +69,7 @@ const unavailable = (box, repo) => {
   box.innerHTML = `<p class="status">unavailable right now · <a href="https://github.com/${repo}">source</a></p>`;
 };
 
-// Per section: the progress.json document on screen, its checked carts, and the map parsed from it (once its figure
-// is near the screen).
+// Per section: the checked carts of the progress.json on screen, and whether its figure has neared the screen.
 const docs = new Map();
 const headerDialog = document.getElementById('rom-header');
 
@@ -81,7 +80,7 @@ async function numbers(section) {
   const end = await source(`cake:${repo}:progress`, () => fetched(sourceUrls(repo).progress), (text) => {
     const document_ = JSON.parse(text);
     const carts = parseProgress(document_, versions);
-    docs.set(section, { document: document_, carts });
+    docs.set(section, { carts });
     render(section);
   });
   if (end === 'none') unavailable(box, repo);
@@ -111,13 +110,7 @@ function render(section) {
   const title = section.querySelector('h2 a');
   if (title) title.textContent = cart.header && cart.header.name ? cart.header.name : cart.id;
   section.querySelector('.numbers').innerHTML = breakdownHtml(cart) + specHtml(cart);
-  if (docs.get(`${key}:wanted`)) {
-    try {
-      redraw(section);
-    } catch {
-      section.querySelector('.figure[data-map]').innerHTML = '<p class="status">no map for this version yet</p>';
-    }
-  }
+  if (docs.get(`${key}:wanted`)) draw(section);
 }
 
 function select(section, version, focus) {
@@ -163,33 +156,45 @@ function wire(section) {
   });
 }
 
-const parsed = new Map();
+// The parsed map of each repo version, fetched once per visit; a failed fetch is forgotten so the next tab open retries.
+const models = new Map();
+const model = (repo, version) => {
+  const key = `${repo} ${version}`;
+  if (!models.has(key)) {
+    models.set(key, fetched(mapUrl(repo, version)).then((text) => parseMap(JSON.parse(text))));
+    models.get(key).catch(() => models.delete(key));
+  }
+  return models.get(key);
+};
 
-// Draw the map of the selected version. Throws when the document has no usable map for it.
-function redraw(section) {
+// Draw the map of the selected version, fetching its map file the first time. Resolves to live or none.
+async function draw(section) {
   const { repo, version } = section.dataset;
   const figure = section.querySelector('.figure[data-map]');
-  const map = mapOf(docs.get(section).document, version);
-  if (!map) throw new TypeError(`progress.json has no map for ${version}`);
-  if (!parsed.has(map)) parsed.set(map, parseMap(map));
-  const inner = figureInner(parsed.get(map), repo);
-  if (fnDialog && fnDialog.open && fnDialog.dataset.map === section.dataset.key) return;
-  figure.innerHTML = inner;
-  bind(section);
+  if (section.dataset.drawn === version) return 'live';
+  if (!models.has(`${repo} ${version}`)) figure.innerHTML = '<p class="status">loading…</p>';
+  try {
+    const parsed = await model(repo, version);
+    if (section.dataset.version !== version) return 'none';
+    if (fnDialog && fnDialog.open && fnDialog.dataset.map === section.dataset.key) return 'live';
+    figure.innerHTML = figureInner(parsed, repo);
+    section.dataset.drawn = version;
+    bind(section);
+    return 'live';
+  } catch {
+    if (section.dataset.version === version) {
+      delete section.dataset.drawn;
+      unavailable(figure, repo);
+    }
+    return 'none';
+  }
 }
 
 async function memoryMap(section) {
   docs.set(`${section.dataset.key}:wanted`, true);
-  const figure = section.querySelector('.figure[data-map]');
-  try {
-    if (!docs.has(section)) throw new Error('no numbers yet');
-    redraw(section);
-    return 'live';
-  } catch {
-    if (docs.has(section)) figure.innerHTML = '<p class="status">no map for this version yet</p>';
-    else unavailable(figure, section.dataset.repo);
-    return 'none';
-  }
+  if (docs.has(section)) return draw(section);
+  unavailable(section.querySelector('.figure[data-map]'), section.dataset.repo);
+  return 'none';
 }
 
 const sections = [...document.querySelectorAll('section.rom[data-repo]')];
