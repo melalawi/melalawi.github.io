@@ -9,7 +9,7 @@
 // the neighbouring functions, shows what the function does and its C, and
 // links its source line on GitHub. A tap between slices or on a row's offset
 // picks the nearest slice in the nearest row, so the thinnest functions are reachable on a phone.
-import { breakdownHtml, detailHtml, figureInner, functionLines, headerRows, mapUrl, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, tabsHtml } from './cake.js';
+import { anchorId, versionFromHash, breakdownHtml, detailHtml, figureInner, functionLines, headerRows, mapUrl, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, tabsHtml } from './cake.js';
 
 const steppers = new Map();
 const fnDialog = document.getElementById('fn');
@@ -113,9 +113,15 @@ function render(section) {
   if (docs.get(`${key}:wanted`)) draw(section);
 }
 
+// The section carries the anchor of the version it shows (the READMEs link to /attic/cake-unbake/#<repo>-<version>).
+function anchor(section) {
+  section.id = anchorId(section.dataset.repo, section.dataset.version);
+}
+
 function select(section, version, focus) {
   if (section.dataset.version === version) return;
   section.dataset.version = version;
+  anchor(section);
   render(section);
   if (focus) section.querySelector(`.tab[data-version="${CSS.escape(version)}"]`).focus();
 }
@@ -209,12 +215,29 @@ const near = 'IntersectionObserver' in window
       watcher.observe(el);
     }
   : (el, run) => run();
-// Maps are watched once every section has its numbers, so the layout above each figure is settled.
+// The version a location hash names, with that section brought into view.
+function openHash() {
+  for (const section of sections) {
+    const version = versionFromHash(location.hash, section.dataset.repo, section.dataset.versions.split(' '));
+    if (!version || !docs.has(section)) continue;
+    select(section, version, false);
+    section.scrollIntoView();
+    return;
+  }
+}
 sections.forEach((section, i) => {
   section.dataset.key = String(i);
+  const version = versionFromHash(location.hash, section.dataset.repo, section.dataset.versions.split(' '));
+  if (version) section.dataset.version = version;
+  anchor(section);
   wire(section);
 });
-Promise.all(sections.map(numbers)).then((ends) =>
+window.addEventListener('hashchange', openHash);
+// Maps are watched once every section has its numbers, so the layout above each figure is settled.
+Promise.all(sections.map(numbers)).then((ends) => {
+  openHash();
+  return ends;
+}).then((ends) =>
   sections.forEach((section, i) =>
     near(section.querySelector('.figure[data-map]'), () => memoryMap(section).then((map) => (section.dataset.live = `${ends[i]} ${map}`))),
   ),

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { state, detailHtml, figureInner, functionLines, highlightC, legend, sourceUrl, mapData, mapHtml, parseMap, parseProgress, sourceUrls, specRows, specHtml, tabsHtml, breakdownHtml, headerRows, mapUrl, percentOf } from '../assets/js/cake.js';
+import { anchorId, versionFromHash, state, detailHtml, figureInner, functionLines, highlightC, legend, sourceUrl, mapData, mapHtml, parseMap, parseProgress, sourceUrls, specRows, specHtml, tabsHtml, breakdownHtml, headerRows, mapUrl, percentOf } from '../assets/js/cake.js';
 import { maps, mapTwo, progress, progressTwo } from './fixtures.mjs';
 
 const layerBytes = (model, kind) => model.rows.flatMap((r) => r.slices)
@@ -179,4 +179,21 @@ test('detailHtml shows the summary and the C, each only when present; sourceUrl 
   assert.equal(detailHtml({ summary: 'adds <1>' }), '<p class="fn-what">adds &lt;1&gt;</p>');
   assert.match(detailHtml({ code: 'return 1;' }), /^<section class="fn-c"><h3>c<\/h3><pre><span class="tk">return<\/span> <span class="tn">1<\/span>;<\/pre><\/section>$/);
   assert.equal(sourceUrl('Org/g', 'src/a.c', 3), 'https://github.com/Org/g/blob/main/src/a.c#L3');
+});
+
+test('anchorId is the repo name and version, lower case, as the game READMEs link it', () => {
+  assert.equal(anchorId('AbuN64/ragewars-decomp', 'us-rev1'), 'ragewars-decomp-us-rev1');
+  assert.equal(anchorId('AbuN64/BattleTanx-Decomp', 'us'), 'battletanx-decomp-us');
+});
+
+test('versionFromHash picks the listed version a hash names and nothing else', () => {
+  const versions = ['de', 'us', 'us-rev1'];
+  const repo = 'AbuN64/ragewars-decomp';
+  assert.equal(versionFromHash('#ragewars-decomp-us-rev1', repo, versions), 'us-rev1');
+  assert.equal(versionFromHash('#ragewars-decomp-us', repo, versions), 'us');
+  assert.equal(versionFromHash('#RageWars-Decomp-DE', repo, versions), 'de');
+  assert.equal(versionFromHash('#battletanx-decomp-us', repo, versions), null);
+  assert.equal(versionFromHash('#ragewars-decomp-eu', repo, versions), null);
+  assert.equal(versionFromHash('', repo, versions), null);
+  assert.equal(versionFromHash('#%E0%A4%A', repo, versions), null);
 });

@@ -128,6 +128,23 @@ export function specHtml(cart) {
   return `<dl class="spec">${rows}</dl>`;
 }
 
+// The anchor of one repo's version on the page: `<repo name>-<version>`, lower case (ragewars-decomp-us-rev1). The game
+// READMEs link their map image to /attic/cake-unbake/#<anchor>.
+export function anchorId(repo, version) {
+  return `${repo.split('/').pop()}-${version}`.toLowerCase();
+}
+
+// The version of `repo` that a location hash names, else null.
+export function versionFromHash(hash, repo, versions) {
+  let wanted;
+  try {
+    wanted = decodeURIComponent(hash.replace(/^#/, '')).toLowerCase();
+  } catch {
+    return null;
+  }
+  return versions.find((version) => anchorId(repo, version) === wanted) || null;
+}
+
 // One tab per version, labelled by its cartridge ID with the version code under it; `selected` is the version shown.
 // Roving tabindex: only the selected tab is in the tab order, the arrow keys move between tabs.
 export function tabsHtml(carts, selected, key) {
