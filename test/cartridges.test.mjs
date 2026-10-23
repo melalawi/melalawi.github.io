@@ -41,3 +41,8 @@ test('cartridgeId returns the default version ID, throws when a total disagrees 
   const down = async () => { throw Object.assign(new Error('HTTP 500'), { status: 500 }); };
   await assert.rejects(cartridgeId(game, down), /HTTP 500/);
 });
+
+test('parseReadme reads a bar that carries the fuzzy reach after its percent', () => {
+  const fuzzy = readme.replace('50.00%  1,000 of 2,000', '50.00% (~75.00%)  1,000 of 2,000');
+  assert.deepEqual(parseReadme(fuzzy).get('us').code, [1000, 2000]);
+});

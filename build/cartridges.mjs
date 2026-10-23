@@ -13,7 +13,7 @@ export function parseReadme(text) {
   const block = /\| ([\w-]+) \(([A-Z0-9-]+),[^\n]*\|\n\|---\|\n\| <pre>([\s\S]*?)<\/pre>/g;
   for (const [, version, id, body] of text.matchAll(block)) {
     const pair = (label) => {
-      const m = new RegExp(`<code>(?:[├└] )?${label}\\s+\\[[^\\]]*\\]\\s+[\\d.]+%\\s+([\\d,]+) of ([\\d,]+)`).exec(body);
+      const m = new RegExp(`<code>(?:[├└] )?${label}\\s+\\[[^\\]]*\\]\\s+[\\d.]+%\\s+(?:\\(~[\\d.]+%\\)\\s+)?([\\d,]+) of ([\\d,]+)`).exec(body);
       return m ? [count(m[1]), count(m[2])] : null;
     };
     entries.set(version, { id, code: pair('code'), functions: pair('functions') });
