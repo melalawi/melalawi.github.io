@@ -1,6 +1,6 @@
 // Cake unbake: the built page has no numbers. Each ROM section reads its repo's progress.json (schema 2: the numbers and
 // the cartridge header fields per version) from main on every visit. A tab per version picks the one shown (the site's
-// default first): its ROM breakdown, whose header block opens the header fields, its numbers and its memory map, read
+// default first): its ROM breakdown, whose parts each open their own rows, its numbers and its memory map, read
 // from that version's docs/map-<version>.json once the figure nears the screen and then kept for the visit. The last good copy is
 // kept in this browser and drawn first, so a failed or malformed fetch keeps the last numbers on screen; with no copy
 // yet the section says the numbers are unavailable.  Only code is drawn on the map.
@@ -9,7 +9,7 @@
 // the neighbouring functions, shows what the function does and its C, and
 // links its source line on GitHub. A tap between slices or on a row's offset
 // picks the nearest slice in the nearest row, so the thinnest functions are reachable on a phone.
-import { anchorId, versionFromHash, breakdownHtml, detailHtml, figureInner, functionLines, headerRows, mapUrl, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, tabsHtml } from './cake.js';
+import { anchorId, versionFromHash, breakdownHtml, detailHtml, figureInner, functionLines, partRows, mapUrl, parseMap, parseProgress, rawUrl, sourceUrl, sourceUrls, specHtml, tabsHtml } from './cake.js';
 
 const steppers = new Map();
 const fnDialog = document.getElementById('fn');
@@ -71,7 +71,7 @@ const unavailable = (box, repo) => {
 
 // Per section: the checked carts of the progress.json on screen, and whether its figure has neared the screen.
 const docs = new Map();
-const headerDialog = document.getElementById('rom-header');
+const partDialog = document.getElementById('rom-part');
 
 async function numbers(section) {
   const { repo } = section.dataset;
@@ -108,7 +108,7 @@ function render(section) {
   }
   // The heading names the ROM shown: its internal name when the cart has header fields, else its cartridge ID.
   const title = section.querySelector('h2 a');
-  if (title) title.textContent = cart.header && cart.header.name ? cart.header.name : cart.id;
+  if (title) title.textContent = cart.header && cart.header.name ? cart.header.name.toLowerCase() : cart.id.toLowerCase();
   section.querySelector('.numbers').innerHTML = breakdownHtml(cart) + specHtml(cart);
   if (docs.get(`${key}:wanted`)) draw(section);
 }
@@ -126,12 +126,12 @@ function select(section, version, focus) {
   if (focus) section.querySelector(`.tab[data-version="${CSS.escape(version)}"]`).focus();
 }
 
-function openHeader(section) {
+function openPart(section, name) {
   const cart = docs.get(section).carts.find((c) => c.version === section.dataset.version);
-  if (!headerDialog || !cart.header) return;
-  headerDialog.querySelector('h2').textContent = `${cart.id} header`;
-  headerDialog.querySelector('dl').replaceChildren(
-    ...headerRows(cart.header).map(([k, v]) => {
+  if (!partDialog || (name === 'header' && !cart.header)) return;
+  partDialog.querySelector('h2').textContent = `${cart.id.toLowerCase()} ${name}`;
+  partDialog.querySelector('dl').replaceChildren(
+    ...partRows(cart, name).map(([k, v]) => {
       const div = document.createElement('div');
       const dt = document.createElement('dt');
       const dd = document.createElement('dd');
@@ -141,14 +141,15 @@ function openHeader(section) {
       return div;
     }),
   );
-  headerDialog.showModal();
+  partDialog.showModal();
 }
 
 function wire(section) {
   section.addEventListener('click', (event) => {
     const tab = event.target.closest('.tab[data-version]');
     if (tab) return select(section, tab.dataset.version, false);
-    if (event.target.closest('.header-block')) openHeader(section);
+    const part = event.target.closest('.part[data-part]');
+    if (part) openPart(section, part.dataset.part);
   });
   section.addEventListener('keydown', (event) => {
     const tab = event.target.closest('.tab[data-version]');

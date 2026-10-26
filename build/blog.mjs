@@ -1,4 +1,5 @@
-// Blog posts live at posts/YYYY/MM-DD-slug.md with title, date, tags and summary front matter.
+// Blog posts live at posts/YYYY/MM-DD-slug.md with title, date, tags and summary front matter, and optionally
+// `updated`, the date the post was last edited (the date itself when absent). Tags only reach the feed.
 import { parse as parseYaml } from 'yaml';
 
 const POST_PATH = /^(\d{4})\/(\d{2})-(\d{2})-([a-z0-9][a-z0-9-]*)\.md$/;
@@ -7,13 +8,6 @@ export function splitFrontMatter(text) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text);
   if (!match) return { data: {}, body: text };
   return { data: parseYaml(match[1]) || {}, body: match[2] };
-}
-
-export function tagSlug(tag) {
-  return String(tag)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 function isoDate(value) {
@@ -36,9 +30,12 @@ export function parsePost(relativePath, text) {
     throw new Error(`${path}: date ${date} does not match the file name`);
   }
   const tags = [...new Set((data.tags || []).map(String))].sort();
+  const updated = data.updated === undefined ? date : isoDate(data.updated);
+  if (updated < date) throw new Error(`${path}: updated ${updated} is before its date`);
   return {
     title: String(data.title),
     date,
+    updated,
     year,
     slug,
     summary: String(data.summary),
@@ -62,15 +59,3 @@ export function groupByYear(posts) {
   return [...years.entries()].map(([year, items]) => ({ year, posts: items }));
 }
 
-// Tag index sorted by tag slug, each with its posts newest first.
-export function tagIndex(posts) {
-  const tags = new Map();
-  for (const post of sortPosts(posts)) {
-    for (const tag of post.tags) {
-      const slug = tagSlug(tag);
-      if (!tags.has(slug)) tags.set(slug, { tag, slug, posts: [] });
-      tags.get(slug).posts.push(post);
-    }
-  }
-  return [...tags.values()].sort((a, b) => a.slug.localeCompare(b.slug));
-}

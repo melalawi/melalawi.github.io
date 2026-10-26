@@ -151,15 +151,17 @@ export function tabsHtml(carts, selected, key) {
   const tabs = carts
     .map((c) => {
       const on = c.version === selected;
-      return `<button type="button" role="tab" class="tab" id="tab-${e(key)}-${e(c.version)}" data-version="${e(c.version)}" aria-selected="${on}" aria-controls="panel-${e(key)}" tabindex="${on ? 0 : -1}"><span class="tab-id">${e(c.id)}</span><span class="tab-v">${e(c.version)}</span></button>`;
+      return `<button type="button" role="tab" class="tab" id="tab-${e(key)}-${e(c.version)}" data-version="${e(c.version)}" aria-selected="${on}" aria-controls="panel-${e(key)}" tabindex="${on ? 0 : -1}"><span class="tab-id">${e(c.id.toLowerCase())}</span><span class="tab-v">${e(c.version)}</span></button>`;
     })
     .join('');
   return `<div class="tabs" role="tablist" aria-label="rom version">${tabs}</div>`;
 }
 
-// The ROM breakdown: the header block at offset 0 (cartridge header and boot code, a button that opens the header's
-// fields), then code, data and blobs, each as wide as its share of the ROM. What they do not cover is the empty rest.
+// The ROM breakdown: the header block at offset 0 (cartridge header and boot code), then code, data and blobs, each as
+// wide as its share of the ROM. Every part is a button with no text that opens its own rows. What they do not cover is
+// the empty rest.
 export const PARTS = [
+  ['header', (c) => c.header.bytes],
   ['code', (c) => c.code.total],
   ['data', (c) => c.data.total],
   ['blobs', (c) => c.blobs.total],
@@ -173,10 +175,26 @@ export function percentOf(size, total) {
 
 export function breakdownHtml(cart) {
   const parts = PARTS.map(([name, size]) => [name, size(cart)]).filter(([, size]) => size > 0);
-  const bar = parts.map(([name, size]) => `<i class="part-${name}" style="width:${share(size / cart.romSize)}" title="${name} ${n(size)} bytes"></i>`).join('');
+  const bar = parts.map(([name, size]) => `<button type="button" class="part part-${name}" data-part="${name}" style="width:${share(size / cart.romSize)}" aria-haspopup="dialog" aria-label="${name}"></button>`).join('');
   const key = parts.map(([name, size]) => `<span><i class="part-${name}"></i>${name} <b>${percentOf(size, cart.romSize)}</b></span>`).join('');
-  const head = '<button type="button" class="header-block" aria-haspopup="dialog" title="rom header: open its fields">header</button>';
-  return `<div class="breakdown"><div class="bar">${head}<span class="parts">${bar}</span></div><p class="parts-key">${key}</p></div>`;
+  return `<div class="breakdown"><div class="bar"><span class="parts">${bar}</span></div><p class="parts-key">${key}</p></div>`;
+}
+
+// The rows of one part of the bar, one fact per row: the header's parsed fields, or a part's size, its share of the
+// ROM and how much of it is done.
+export function partRows(cart, name) {
+  if (name === 'header') return headerRows(cart.header);
+  const [done, total, verb] = {
+    code: [cart.code.matched, cart.code.total, 'matched'],
+    data: [cart.data.matched, cart.data.total, 'matched'],
+    blobs: [cart.blobs.decoded, cart.blobs.total, 'decoded'],
+  }[name];
+  return [
+    ['size', `${n(total)} bytes`],
+    ['share of rom', percentOf(total, cart.romSize)],
+    [verb, `${n(done)} bytes`],
+    [`${verb} share`, total ? pct((done / total) * 100) : pct(0)],
+  ];
 }
 
 const hex8 = (value) => hex(value, 8);
@@ -186,7 +204,7 @@ const hex2 = (value) => hex(value, 2);
 export function headerRows(header) {
   const { pi } = header;
   return [
-    ['size', `${n(header.bytes)} bytes with the boot code`],
+    ['size', `${n(header.bytes)} bytes`],
     ['internal name', header.name],
     ['game id', header.game_id],
     ['country', header.country],
@@ -194,7 +212,10 @@ export function headerRows(header) {
     ['release', header.release ? `libultra ${header.release}` : 'unknown'],
     ['entry point', hex8(header.entry_point)],
     ['clock rate', hex8(header.clock_rate)],
-    ['pi settings', `latency ${hex2(pi.latency)} · pulse width ${hex2(pi.pulse_width)} · page size ${pi.page_size} · release ${pi.release}`],
+    ['pi latency', hex2(pi.latency)],
+    ['pi pulse width', hex2(pi.pulse_width)],
+    ['pi page size', String(pi.page_size)],
+    ['pi release', String(pi.release)],
     ['crc1', hex8(header.crc1)],
     ['crc2', hex8(header.crc2)],
   ];

@@ -3,12 +3,22 @@ import { mkdir, readFile, readdir, rm, writeFile, copyFile } from 'node:fs/promi
 import { basename, dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { marked } from 'marked';
-import { groupByYear, parsePost, sortPosts, splitFrontMatter, tagIndex, tagSlug } from './blog.mjs';
-import { anchorHeadings, CLOSE, escapeHtml, heading, layout, postList, resumeUrl, slugify, tagLinks } from './html.mjs';
+import { groupByYear, parsePost, sortPosts, splitFrontMatter } from './blog.mjs';
+import { anchorHeadings, CLOSE, codeFigure, escapeHtml, footnotes, heading, layout, postList, slugify } from './html.mjs';
+import { highlightC } from '../assets/js/cake.js';
 import { cartridgeId, fetchText } from './cartridges.mjs';
 import { rss } from './rss.mjs';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+// Code blocks in pages and posts render as captioned figures (html.mjs codeFigure).
+marked.use({ renderer: { code: ({ text, lang }) => codeFigure(text, lang, highlightC) } });
+
+// Markdown to article HTML: footnotes out, the rest through marked, the footnote list last.
+function prose(markdown) {
+  const { body, list } = footnotes(markdown);
+  return anchorHeadings(marked.parse(body)) + list;
+}
 const STYLES = ['tokens.css', 'atoms.css', 'site.css'];
 
 async function walk(dir) {
@@ -50,9 +60,20 @@ async function loadContent(root, fetchSource) {
   return { site, cartridges, pages, archive, posts: sortPosts(posts) };
 }
 
-function article(page, extra = '') {
-  return `${heading(page.data.title, page.data.subtitle)}
-<article class="prose">${anchorHeadings(marked.parse(page.body))}</article>${extra}`;
+function article(page, extra = '', big = false) {
+  return `${heading(page.data.title, big)}
+<article class="prose">${prose(page.body)}</article>${extra}`;
+}
+
+// The contact dialog on every page: the contact page's text, then the form.
+function contactDialog(page, contact) {
+  if (!page || !contact) return '';
+  return `<dialog class="modal" id="contact" aria-labelledby="contact-title">
+<div class="modal-head"><h2 id="contact-title">${escapeHtml(page.data.title)}</h2>${CLOSE}</div>
+<div class="prose">${prose(page.body)}</div>
+${contactForm(contact)}
+</dialog>
+`;
 }
 
 function contactForm(contact) {
@@ -65,6 +86,11 @@ function contactForm(contact) {
 <input type="text" name="_gotcha" hidden tabindex="-1" autocomplete="off">
 <div class="container axis-row"><button class="button" type="submit">${escapeHtml(contact.button)}</button></div>
 </form>`;
+}
+
+// A ROM's own cake unbake page.
+function gameUrl(game) {
+  return `/attic/cake-unbake/${game.id}/`;
 }
 
 // One ROM: its heading, named by the cartridge ID of the default version read from the repo, and an empty frame. The page
@@ -82,23 +108,21 @@ function romSection(game, cart) {
 
 function archiveEntry({ data }) {
   const links = (data.links || []).map((l) => `<a href="${escapeHtml(l.href)}">${escapeHtml(l.label)}</a>`).join(' · ');
-  return `<li><img class="icon" src="${escapeHtml(data.icon)}" alt="" width="20" height="20"><span><strong>${escapeHtml(data.title)}</strong> <span class="sub">${escapeHtml(data.subtitle)}</span><span class="note">${escapeHtml(data.years)}${links ? ` · ${links}` : ''}</span></span></li>`;
+  return `<li><img class="icon" src="${escapeHtml(data.icon)}" alt="" width="20" height="20"><span><strong>${escapeHtml(data.title)}</strong><span class="note">${escapeHtml(data.years)}${links ? ` · ${links}` : ''}</span></span></li>`;
 }
 
 // The index beside every page: the site entries in fixed order (the title links home), each with its own sections nested under it.
-function siteIndex({ site, posts }) {
+function siteIndex({ site, cartridges }) {
   return [
-    { label: 'home', href: '/', children: site.resume ? [{ label: 'my resume', href: resumeUrl(site.resume), modal: 'resume' }] : [] },
+    { label: 'home', href: '/', children: [] },
     {
       label: 'attic',
       href: '/attic/',
       children: [
-        { label: 'cake unbake', href: '/attic/cake-unbake/' },
+        { label: 'cake unbake', href: '/attic/cake-unbake/', children: site.games.map((game) => ({ label: cartridges[game.id], href: gameUrl(game) })) },
         { label: 'archive', href: '/attic/archive/' },
       ],
     },
-    { label: 'blog', href: '/blog/', children: posts.slice(0, 5).map((p) => ({ label: p.title, href: p.url })) },
-    { label: 'contact', href: '/contact/', children: [] },
   ];
 }
 
@@ -107,28 +131,40 @@ export function renderSite(content) {
   const { site, pages, archive, posts, cartridges } = content;
   const index = siteIndex(content);
   const out = new Map();
-  const page = (path, title, body, extra = {}) => layout(site, { title, path, body, index, ...extra });
+  const dialogs = contactDialog(pages.contact, site.contact);
+  const page = (path, title, body, extra = {}) => layout(site, { title, path, body, index, dialogs, ...extra });
 
-  out.set('index.html', page('/', '', article(pages.home)));
+  out.set('index.html', page('/', '', article(pages.home, '', true)));
 
   const cake = pages['cake-unbake'];
+  // One page per ROM under /attic/cake-unbake/<id>/. The cake unbake page lists them and sends the READMEs' old
+  // /attic/cake-unbake/#<repo>-<version> links on to the ROM's own page.
+  const moved = Object.fromEntries(site.games.map((game) => [game.repo.split('/').pop().toLowerCase(), gameUrl(game)]));
   out.set(
     'attic/cake-unbake/index.html',
     page('/attic/cake-unbake/', cake.data.title, `<p class="back"><a href="/attic/">attic</a></p>
-${heading(cake.data.title, cake.data.subtitle)}
-${site.games.map((game) => romSection(game, cartridges[game.id])).join('\n')}
+${heading(cake.data.title)}
+<ul class="projects">${site.games.map((game) => `<li><a href="${gameUrl(game)}"><strong>${escapeHtml(cartridges[game.id].toLowerCase())}</strong></a></li>`).join('\n')}</ul>
+<script>const moved = ${JSON.stringify(moved)}; const hash = location.hash.slice(1).toLowerCase(); for (const [repo, url] of Object.entries(moved)) if (hash.startsWith(repo + '-')) location.replace(url + location.hash);</script>`),
+  );
+  for (const game of site.games) {
+    out.set(
+      `${gameUrl(game).slice(1)}index.html`,
+      page(gameUrl(game), cartridges[game.id], `<p class="back"><a href="/attic/cake-unbake/">${escapeHtml(cake.data.title)}</a></p>
+${romSection(game, cartridges[game.id])}
 <dialog class="modal" id="fn" aria-labelledby="fn-title">
 <div class="modal-head"><h2 id="fn-title"></h2>${CLOSE}</div>
 <dl class="spec"></dl>
 <div class="fn-body"></div>
 <p class="modal-actions"><button type="button" class="step" data-step="-1" aria-label="previous function">‹ prev</button><button type="button" class="step" data-step="1" aria-label="next function">next ›</button><a class="fn-source" target="_blank" rel="noopener">source</a></p>
 </dialog>
-<dialog class="modal" id="rom-header" aria-labelledby="rom-header-title">
-<div class="modal-head"><h2 id="rom-header-title">rom header</h2>${CLOSE}</div>
+<dialog class="modal" id="rom-part" aria-labelledby="rom-part-title">
+<div class="modal-head"><h2 id="rom-part-title"></h2>${CLOSE}</div>
 <dl class="spec"></dl>
 </dialog>
 <script type="module" src="/js/map.js"></script>`),
-  );
+    );
+  }
   out.set(
     'attic/index.html',
     page('/attic/', 'attic', `${heading('my passion projects')}
@@ -143,14 +179,12 @@ ${heading('archive')}
   );
 
   const years = groupByYear(posts)
-    .map((group) => `<section><h2 id="y${group.year}">${group.year}</h2>${postList(group.posts, tagSlug)}</section>`)
+    .map((group) => `<section><h2 id="y${group.year}">${group.year}</h2>${postList(group.posts)}</section>`)
     .join('\n');
-  const tags = tagIndex(posts);
   out.set(
     'blog/index.html',
     page('/blog/', 'blog', `${heading('blog')}
-${tags.length ? `<p>${tagLinks(tags.map((t) => t.tag), tagSlug)}</p>` : ''}
-${years || postList([], tagSlug)}
+${years || postList([])}
 <p class="back"><a href="/blog/feed.xml">rss feed</a></p>`),
   );
   for (const post of posts) {
@@ -159,23 +193,15 @@ ${years || postList([], tagSlug)}
       page(
         post.url,
         post.title,
-        `${heading(post.title, post.summary)}
-<p class="back"><time datetime="${post.date}">${post.date}</time> ${tagLinks(post.tags, tagSlug)}</p>
-<article class="prose">${anchorHeadings(marked.parse(post.body))}</article>`,
+        `${heading(post.title)}
+<p class="back"><em>last edited <time datetime="${post.updated}">${post.updated}</time></em></p>
+<article class="prose">${prose(post.body)}</article>`,
         { description: post.summary },
       ),
     );
   }
-  for (const tag of tags) {
-    out.set(
-      `blog/tags/${tag.slug}/index.html`,
-      page(`/blog/tags/${tag.slug}/`, `#${tag.tag}`, `${heading(`#${tag.tag}`, `${tag.posts.length} post${tag.posts.length === 1 ? '' : 's'}`)}
-${postList(tag.posts, tagSlug)}`),
-    );
-  }
   out.set('blog/feed.xml', rss(site, posts));
 
-  out.set('contact/index.html', page('/contact/', pages.contact.data.title, article(pages.contact, contactForm(site.contact))));
   out.set('404.html', page('/404', pages['404'].data.title, article(pages['404'])));
   return out;
 }

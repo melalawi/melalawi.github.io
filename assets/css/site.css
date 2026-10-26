@@ -17,8 +17,10 @@ a {
   margin: 0 auto;
 }
 
-/* The index: one serif at one size and weight; plain labels, nested sections indented under them */
+/* The index: the console face at one size and weight, a step smaller so it keeps the serif's width; kebab-case labels, nested sections indented under them */
 .index {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -49,8 +51,10 @@ a {
   gap: var(--space-3);
 }
 
-/* The site title: the index serif, lowercase, untracked, on the index line height */
+/* The site title: the page serif (the rest of the index is the console face), lowercase, untracked */
 .index .name {
+  font-family: var(--font-family-text);
+  font-size: var(--font-size-md);
   font-weight: 700;
   letter-spacing: normal;
   text-transform: none;
@@ -88,23 +92,6 @@ a {
 
 .theme-toggle:hover {
   color: var(--color-accent-press);
-}
-
-.role,
-.links {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  text-wrap: balance;
-}
-
-.links {
-  display: none;
-  flex-wrap: wrap;
-  gap: 0 var(--space-3);
-}
-
-.index .links a {
-  color: var(--color-text-muted);
 }
 
 /* Phone: one clean line of labels; nested sections are laptop only */
@@ -175,14 +162,13 @@ a {
 }
 
 .page-head h1 {
-  font-size: var(--font-size-3xl);
+  font-size: var(--font-size-xl);
   font-weight: 400;
   line-height: var(--line-height-tight);
 }
 
-.sub {
-  font-style: italic;
-  color: var(--color-text-muted);
+.page-head.big h1 {
+  font-size: var(--font-size-3xl);
 }
 
 .back {
@@ -194,23 +180,27 @@ a {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+/* Everything in a post keeps the reading measure and may shrink below its content (code scrolls instead) */
+.prose > * {
+  min-width: 0;
   max-width: var(--measure);
 }
 
 .prose h2,
 .page section > h2 {
   margin-top: var(--space-4);
-  padding-top: var(--space-4);
   font-size: var(--font-size-xl);
   font-weight: 400;
-  border-top: 1px solid var(--color-edge);
 }
 
 .prose h2:target {
   color: var(--color-accent-press);
 }
 
-.prose ul {
+.prose ul,
+.prose ol {
   padding-left: 1.3em;
 }
 
@@ -218,6 +208,61 @@ a {
   width: 100%;
   height: 80vh;
   border: 1px solid var(--color-edge);
+}
+
+/* Inline code sits in the text at the text's size */
+.prose :not(pre) > code {
+  font-family: var(--font-family-mono);
+  font-size: 0.88em;
+}
+
+/* Code figures: the C on the inset panel, its source as a caption under it */
+.code-figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  min-width: 0;
+}
+
+.code-figure pre {
+  margin: 0;
+  padding: var(--space-3);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+  tab-size: 4;
+  white-space: pre-wrap;
+  background: var(--color-inset);
+  border: 1px solid var(--color-edge);
+}
+
+.code-figure code {
+  font: inherit;
+}
+
+.code-figure figcaption {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.code-figure figcaption a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.code-figure figcaption a:hover {
+  color: var(--color-accent-press);
+  text-decoration: underline;
+}
+
+.prose details {
+  padding: var(--space-2) 0;
+}
+
+.prose summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
 }
 
 .prose .actions {
@@ -228,7 +273,6 @@ a {
 
 .button {
   padding: 0.35em 0.9em;
-  font-family: var(--font-family-text);
   font-size: var(--font-size-sm);
   letter-spacing: 0;
   color: var(--color-text);
@@ -248,7 +292,6 @@ a {
   flex-direction: column;
   list-style: none;
   max-width: var(--measure);
-  border-top: 1px solid var(--color-edge);
 }
 
 .projects a {
@@ -257,7 +300,6 @@ a {
   gap: var(--space-3);
   padding: var(--space-3) 0;
   text-decoration: none;
-  border-bottom: 1px solid var(--color-edge);
 }
 
 .projects strong {
@@ -289,15 +331,6 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
-.posts li > span {
-  display: flex;
-  flex-direction: column;
-}
-
-.tags a {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
 
 /* Contact form */
 .contact-form {
@@ -311,7 +344,6 @@ a {
 }
 
 .text-input {
-  font-family: var(--font-family-text);
   background: transparent;
   border: 1px solid var(--color-edge-strong);
   border-radius: 0;
@@ -326,11 +358,8 @@ a {
 
 .rom > h2 {
   margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
   font-weight: 400;
-  border-top: 1px solid var(--color-edge);
 }
 
 .rom > h2 a {
@@ -365,7 +394,6 @@ a {
 
 .spec dt {
   flex: 0 0 9rem;
-  font-style: italic;
   color: var(--color-text-muted);
 }
 
@@ -373,7 +401,6 @@ a {
   flex: 1 1 14rem;
   min-width: 0;
   font-family: var(--font-family-mono);
-  font-size: 0.92em;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
@@ -588,7 +615,6 @@ a {
 
 .tab-v {
   font-size: var(--font-size-xs);
-  font-style: italic;
 }
 
 .tab:hover {
@@ -611,7 +637,7 @@ a {
   gap: var(--space-3);
 }
 
-/* ROM breakdown: the header block at offset 0, then one bar of the ROM's bytes by class. */
+/* ROM breakdown: one bar of the ROM's bytes by class, the header block first. */
 .breakdown {
   display: flex;
   flex-direction: column;
@@ -634,29 +660,22 @@ a {
   box-shadow: inset 0 0 0 1px var(--color-edge-strong);
 }
 
-.parts i {
+/* Each part is a button with no text: hover or focus highlights it, a click opens its rows. */
+.part {
   display: block;
-  height: 100%;
-}
-
-.header-block {
   flex: 0 0 auto;
-  padding: 0 var(--space-2);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-xs);
-  color: var(--color-on-accent);
+  min-width: 4px;
+  height: 100%;
+  padding: 0;
   cursor: pointer;
-  background: var(--color-accent);
   border: 0;
 }
 
-.header-block:hover {
-  background: var(--color-accent-press);
-}
-
-.header-block:focus-visible {
+.part:hover,
+.part:focus-visible {
   outline: 2px solid var(--color-text);
-  outline-offset: 2px;
+  outline-offset: -2px;
+  filter: brightness(1.15);
 }
 
 .parts-key {
@@ -664,7 +683,7 @@ a {
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-3);
   margin: 0;
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
 
@@ -686,6 +705,7 @@ a {
   color: var(--color-text);
 }
 
+.part-header { background: var(--color-accent); }
 .part-code { background: var(--heat-exact); }
 .part-data { background: var(--heat-fuzzy-high); }
 .part-blobs { background: var(--heat-fuzzy-low); }
@@ -740,7 +760,6 @@ a {
   width: min(44rem, calc(100vw - 2 * var(--space-3)));
   max-height: calc(100dvh - 2 * var(--space-3));
   padding: var(--space-3) var(--space-4) var(--space-4);
-  font-family: var(--font-family-text);
   color: var(--color-text);
   background: var(--color-chassis);
   border: 1px solid var(--color-edge-strong);
@@ -803,7 +822,7 @@ a {
 }
 
 .modal .spec dt {
-  flex-basis: 5rem;
+  flex-basis: 8rem;
 }
 
 .fn-body {
@@ -850,6 +869,77 @@ a {
   }
 }
 
-#rom-header .spec dt {
-  flex-basis: 8rem;
+
+/* Footnotes: a superscript in the text, the bare links listed at the end */
+.ref {
+  font-size: 0.7em;
+  line-height: 0;
+}
+
+.ref a {
+  text-decoration: none;
+}
+
+.ref + .ref::before {
+  content: ',';
+}
+
+.refs {
+  margin-top: var(--space-4);
+  padding-left: 1.3em;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.refs a {
+  color: inherit;
+}
+
+/* A clip or screenshot still to come: an empty frame at video proportions with what it will show */
+.media-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 9;
+  max-width: 24rem;
+  margin: 0;
+  padding: var(--space-3);
+  text-align: center;
+  background: var(--color-inset);
+  border: 1px dashed var(--color-edge-strong);
+}
+
+.media-slot figcaption {
+  font-size: var(--font-size-sm);
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+/* The sidebar's footer: resume and contact, small and muted */
+.index-foot {
+  display: flex;
+  gap: var(--space-3);
+  font-size: var(--font-size-xs);
+}
+
+.index .index-foot a {
+  color: var(--color-text-muted);
+}
+
+.index .index-foot a:hover {
+  color: var(--color-accent-press);
+}
+
+#contact .prose {
+  margin-bottom: var(--space-3);
+}
+
+/* Phone: code wraps at spaces on the narrow column, at the smallest size */
+@media (max-width: 40rem) {
+  .code-figure pre {
+    padding: var(--space-2);
+    font-size: var(--font-size-xs);
+    overflow-wrap: anywhere;
+  }
 }

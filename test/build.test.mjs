@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ROOT, renderSite } from '../build/build.mjs';
 import { parsePost } from '../build/blog.mjs';
-import { analyticsBeacon, anchorHeadings, bookIndex } from '../build/html.mjs';
+import { analyticsBeacon, anchorHeadings, bookIndex, codeFigure, footnotes, kebab } from '../build/html.mjs';
 
 const games = [{ id: 'one', repo: 'Org/game-one', wiki: 'https://wiki.test/Game_One', versions: ['us', 'eu'], default: 'us' }];
 const site = {
@@ -24,34 +24,52 @@ const render = () => {
   return renderSite({ site, pages, archive, posts, cartridges: { one: 'NUS-NXXE-1' } });
 };
 
-test('renderSite writes every page, tag page and the feed, and no old routes', () => {
+test('renderSite writes every page and the feed, and no old routes or tag pages', () => {
   const out = render();
   for (const path of [
-    'index.html', 'attic/index.html', 'attic/cake-unbake/index.html', 'attic/archive/index.html', 'blog/index.html',
-    'blog/2026/01-04-p0/index.html', 'blog/tags/x/index.html', 'blog/feed.xml', 'contact/index.html', '404.html',
+    'index.html', 'attic/index.html', 'attic/cake-unbake/index.html', 'attic/cake-unbake/one/index.html', 'attic/archive/index.html', 'blog/index.html',
+    'blog/2026/01-04-p0/index.html', 'blog/feed.xml', '404.html',
   ]) {
     assert.ok(out.has(path), path);
   }
-  assert.ok(![...out.keys()].some((path) => /^(projects|attic\/decomp|attic\/ext)/.test(path) || path.endsWith('.json')));
+  assert.ok(![...out.keys()].some((path) => /^(projects|attic\/decomp|attic\/ext|blog\/tags)/.test(path) || path.endsWith('.json')));
+  const post = out.get('blog/2026/01-04-p0/index.html');
+  assert.match(post, /<p class="back"><em>last edited <time datetime="2026-01-04">2026-01-04<\/time><\/em><\/p>/);
+  assert.ok(!/class="(role|links)"/.test(post));
+  assert.ok(!/#x|class="tags"/.test(post + out.get('blog/index.html')));
   const home = out.get('index.html');
   const labels = [...home.matchAll(/<span class="entry"><a href="([^"]+)"[^>]*>([^<]+)<\/a>/g)].map((m) => [m[2], m[1]]);
-  assert.deepEqual(labels, [['home', '/'], ['attic', '/attic/'], ['blog', '/blog/'], ['contact', '/contact/']]);
-  const contact = out.get('contact/index.html');
+  assert.deepEqual(labels, [['home', '/'], ['attic', '/attic/']]);
+  assert.ok(!out.has('contact/index.html'));
+  assert.match(home, /<p class="index-foot"><a href="https:\/\/drive\.google\.com\/file\/d\/R1\/view" data-modal="resume">resume<\/a><a href="#contact" data-modal="contact">contact<\/a><\/p>\n<\/nav>/);
+  const contact = home.split('<dialog class="modal" id="contact"')[1];
+  assert.ok(contact);
   for (const field of ['action="https://forms.example/x"', 'name="email"', 'name="name"', 'name="message"', 'name="_next" value="/thanks"', 'name="_subject" value="Hi"', 'name="_gotcha"']) {
     assert.ok(contact.includes(field), field);
   }
 });
 
-test('cake unbake builds a frame per ROM with no numbers, linked to the game article, and names no game in visible text', () => {
-  const html = render().get('attic/cake-unbake/index.html');
+test('cake unbake lists one page per ROM by cartridge ID, nests them in the index and forwards the old README anchors', () => {
+  const out = render();
+  const list = out.get('attic/cake-unbake/index.html');
+  const main = list.split('<main')[1];
+  assert.match(main, /<ul class="projects"><li><a href="\/attic\/cake-unbake\/one\/"><strong>nus-nxxe-1<\/strong><\/a><\/li><\/ul>/);
+  assert.ok(!main.includes('class="rom"'));
+  assert.match(main, /const moved = \{"game-one":"\/attic\/cake-unbake\/one\/"\}/);
+  const side = out.get('attic/cake-unbake/one/index.html').split('<main')[0];
+  assert.match(side, /<li><a href="\/attic\/cake-unbake\/">cake-unbake<\/a><ul><li><a href="\/attic\/cake-unbake\/one\/" aria-current="page">nus-nxxe-1<\/a><\/li><\/ul><\/li>/);
+});
+
+test('a ROM page builds its frame with no numbers, linked to the game article, and names no game in visible text', () => {
+  const html = render().get('attic/cake-unbake/one/index.html');
   const visible = html.replace(/<script[\s\S]*?<\/script>/g, ' ').replace(/<[^>]*>/g, ' ');
   assert.ok(!/decomp|game-one|toolchain/i.test(visible));
-  assert.ok(!html.includes('class="prose"'));
   const main = html.split('<main')[1].split('<dialog')[0];
+  assert.ok(!main.includes('class="prose"'));
   assert.ok(!/class="(spec|versions|map|map-data)"/.test(main));
   assert.equal(main.replace(/<[^>]*>/g, ' ').replace(/NUS-[A-Z0-9-]+/g, '').match(/\d/), null);
   assert.match(html, /<section class="rom" data-repo="Org\/game-one" data-version="us" data-versions="us eu">\n<h2 id="nus-nxxe-1"><a href="https:\/\/wiki\.test\/Game_One">NUS-NXXE-1<\/a><\/h2>\n<div class="tabs-slot"><\/div>\n<div class="panel">\n<div class="numbers"><p class="status">loading…<\/p><\/div>\n<figure class="figure" data-map><p class="status">loading…<\/p><\/figure>\n<\/div>\n<\/section>/);
-  assert.match(html, /<dialog class="modal" id="rom-header" aria-labelledby="rom-header-title">[\s\S]*<dl class="spec"><\/dl>\n<\/dialog>/);
+  assert.match(html, /<dialog class="modal" id="rom-part" aria-labelledby="rom-part-title">[\s\S]*<dl class="spec"><\/dl>\n<\/dialog>/);
   assert.match(html, /<script type="module" src="\/js\/map.js"><\/script>/);
 });
 
@@ -95,11 +113,11 @@ test('bookIndex keeps entry order and each entry\'s section order', () => {
     ],
     '/attic/a/',
   );
-  assert.ok(html.indexOf('Home') < html.indexOf('Attic'));
-  assert.ok(html.indexOf('Zed') < html.indexOf('Alpha'));
+  assert.ok(html.indexOf('home') < html.indexOf('attic'));
+  assert.ok(html.indexOf('zed') < html.indexOf('alpha'));
   assert.ok(!html.includes('class="letter"'));
-  assert.match(html, /<li><span class="entry"><a href="\/">Home<\/a><\/span><\/li>/);
-  assert.match(html, /href="\/attic\/a\/" aria-current="page">Alpha/);
+  assert.match(html, /<li><span class="entry"><a href="\/">home<\/a><\/span><\/li>/);
+  assert.match(html, /href="\/attic\/a\/" aria-current="page">alpha/);
   assert.ok(!/href="\/"[^>]*aria-current/.test(html));
 });
 
@@ -138,15 +156,19 @@ test('one glyph toggle flips light and dark, and the head script sets the stored
 });
 
 test('the real pages and site.json keep titles, headings, buttons and labels lowercase', async () => {
-  const files = ['home', 'contact', '404', 'cake-unbake'].map((name) => join(ROOT, 'content', `${name}.md`));
+  const { readdir } = await import('node:fs/promises');
+  const postFiles = (await readdir(join(ROOT, 'posts'), { recursive: true })).filter((f) => f.endsWith('.md')).map((f) => join(ROOT, 'posts', f));
+  const archiveFiles = (await readdir(join(ROOT, 'content', 'archive'))).map((f) => join(ROOT, 'content', 'archive', f));
+  const files = ['home', 'contact', '404', 'cake-unbake'].map((name) => join(ROOT, 'content', `${name}.md`)).concat(postFiles, archiveFiles);
   const texts = [];
   for (const file of files) {
     const md = await readFile(file, 'utf8');
-    texts.push(...[...md.matchAll(/^(?:title: |#+ )(.+)$/gm)].map((m) => m[1]));
+    texts.push(...[...md.matchAll(/^(?:title: |#+ |- )(.+)$/gm)].map((m) => m[1]));
+    assert.ok(!/^subtitle:/m.test(md), file);
     texts.push(...[...md.matchAll(/class="button"[^>]*>([^<]+)</g)].map((m) => m[1]));
   }
   const real = JSON.parse(await readFile(join(ROOT, 'site.json'), 'utf8'));
-  texts.push(real.title, real.handle, real.tagline, real.contact.button, ...real.links.map((l) => l.label));
+  texts.push(real.title, real.handle, real.tagline, real.contact.button);
   assert.ok(texts.length > 12);
   for (const text of texts) {
     const plain = text.replace(KEEP, '');
@@ -159,19 +181,20 @@ test('the site title ends in an underscore cursor and loads no web font', () => 
   assert.match(render().get('index.html'), /<a class="name" href="\/">me<span class="caret" aria-hidden="true">_<\/span><\/a>/);
 });
 
-test('the resume opens in a dialog on every page and no about page exists or is linked', () => {
+test('resume and contact open in dialogs on every page and no about page exists or is linked', () => {
   const out = render();
   for (const [path, html] of out) {
     if (!path.endsWith('.html')) continue;
     assert.ok(!html.includes('href="/about/'), path);
-    assert.match(html, /<a href="https:\/\/drive\.google\.com\/file\/d\/R1\/view" data-modal="resume">my resume<\/a>/, path);
+    assert.match(html, /<a href="https:\/\/drive\.google\.com\/file\/d\/R1\/view" data-modal="resume">resume<\/a>/, path);
+    assert.match(html, /<dialog class="modal" id="contact" aria-labelledby="contact-title">[\s\S]*name="email"/, path);
     assert.match(html, /<dialog class="modal" id="resume"[\s\S]*data-src="https:\/\/drive\.google\.com\/file\/d\/R1\/preview"[\s\S]*open pdf to print/, path);
   }
   assert.ok(![...out.keys()].some((path) => path.startsWith('about/')));
 });
 
 test('the memory map page carries one function dialog with steps and a source link', () => {
-  const html = render().get('attic/cake-unbake/index.html');
+  const html = render().get('attic/cake-unbake/one/index.html');
   assert.equal(html.match(/<dialog class="modal" id="fn"/g).length, 1);
   assert.match(html, /data-step="-1"[\s\S]*data-step="1"[\s\S]*class="fn-source"/);
 });
@@ -197,12 +220,45 @@ test('a game whose repo has no schema 2 progress.json on main is left out of the
   console.warn = (m) => warnings.push(m);
   try {
     await (await import('../build/build.mjs')).build({ outDir, fetchSource });
-    const html = await readFile(join(outDir, 'attic/cake-unbake/index.html'), 'utf8');
+    const html = await readFile(join(outDir, `attic/cake-unbake/${first.id}/index.html`), 'utf8');
     assert.ok(html.includes(`data-repo="${first.repo}"`));
-    assert.ok(!html.includes(`data-repo="${second.repo}"`));
+    const list = await readFile(join(outDir, 'attic/cake-unbake/index.html'), 'utf8');
+    assert.ok(!list.includes(`/attic/cake-unbake/${second.id}/`));
     assert.match(warnings.join('\n'), new RegExp(`skipping ${second.repo}`));
   } finally {
     console.warn = warn;
     await rm(outDir, { recursive: true, force: true });
+  }
+});
+
+test('index labels are kebab case and the index nests one level, plus the pages of the section you are in', () => {
+  assert.equal(kebab('cake unbake'), 'cake-unbake');
+  assert.equal(kebab('NUS-NRWE-1'), 'nus-nrwe-1');
+  assert.equal(kebab('2026-10-25'), '2026-10-25');
+  const tree = [{ label: 'A', href: '/a/', children: [{ label: 'B', href: '/a/b/', children: [{ label: 'C', href: '/a/b/c/' }] }] }];
+  assert.ok(bookIndex(tree, '/a/').includes('>b<') && !bookIndex(tree, '/a/').includes('>c<'));
+  assert.ok(bookIndex(tree, '/a/b/').includes('>c<'));
+  assert.ok(bookIndex(tree, '/a/b/c/').includes('>c<'));
+});
+
+test('a code block is a figure with an italic source link under it', () => {
+  const url = 'https://github.com/o/r/blob/abc123/src/game/X.CPP#L10-L20';
+  const html = codeFigure('s32 f(void) {\n}', `c ${url} Weapons_Check`, (t) => `<b>${t}</b>`);
+  assert.equal(html, `<figure class="code-figure"><pre class="code"><code><b>s32 f(void) {\n}</b></code></pre><figcaption><a href="${url}"><em>source</em></a></figcaption></figure>`);
+  assert.equal(codeFigure('a < b', 'text', (t) => t), '<figure class="code-figure"><pre class="code"><code>a &lt; b</code></pre></figure>');
+});
+
+test('footnotes become superscript links to a bare link list, and a media block is an empty slot', () => {
+  const { body, list } = footnotes('text[^1] and more[^2].\n\n[^1]: https://a.test/x\n[^2]: https://b.test/y\n');
+  assert.match(body, /text<sup class="ref"><a href="#ref-1" id="cite-1">1<\/a><\/sup> and more<sup class="ref"><a href="#ref-2" id="cite-2">2<\/a><\/sup>\./);
+  assert.ok(!body.includes('https://'));
+  assert.equal(list, '<ol class="refs"><li id="ref-1"><a href="https://a.test/x">https://a.test/x</a></li><li id="ref-2"><a href="https://b.test/y">https://b.test/y</a></li></ol>');
+  assert.deepEqual(footnotes('plain'), { body: 'plain', list: '' });
+  assert.equal(codeFigure('', 'media clip of the freeze', (t) => t), '<figure class="media-slot"><figcaption>clip of the freeze</figcaption></figure>');
+});
+
+test('no page carries a subtitle', () => {
+  for (const [path, html] of render()) {
+    if (path.endsWith('.html')) assert.ok(!html.includes('class="sub"'), path);
   }
 });

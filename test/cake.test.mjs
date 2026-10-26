@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { anchorId, versionFromHash, state, detailHtml, figureInner, functionLines, highlightC, legend, sourceUrl, mapData, mapHtml, parseMap, parseProgress, sourceUrls, specRows, specHtml, tabsHtml, breakdownHtml, headerRows, mapUrl, percentOf } from '../assets/js/cake.js';
+import { anchorId, versionFromHash, state, detailHtml, figureInner, functionLines, highlightC, legend, sourceUrl, mapData, mapHtml, parseMap, parseProgress, sourceUrls, specRows, specHtml, tabsHtml, breakdownHtml, headerRows, partRows, mapUrl, percentOf } from '../assets/js/cake.js';
 import { maps, mapTwo, progress, progressTwo } from './fixtures.mjs';
 
 const layerBytes = (model, kind) => model.rows.flatMap((r) => r.slices)
@@ -53,19 +53,20 @@ test('tabs: one per version in the listed order, labelled by cartridge ID, only 
   const html = tabsHtml(parseProgress(progress, ['us', 'eu']), 'us', '0');
   assert.match(html, /^<div class="tabs" role="tablist" aria-label="rom version">/);
   const tabs = [...html.matchAll(/<button [^>]*data-version="([^"]+)" aria-selected="(true|false)"[^>]*tabindex="(-?\d)"><span class="tab-id">([^<]+)<\/span><span class="tab-v">([^<]+)<\/span>/g)].map((m) => m.slice(1));
-  assert.deepEqual(tabs, [['us', 'true', '0', 'NUS-NXXE-1', 'us'], ['eu', 'false', '-1', 'NUS-NXXP-0', 'eu']]);
+  assert.deepEqual(tabs, [['us', 'true', '0', 'nus-nxxe-1', 'us'], ['eu', 'false', '-1', 'nus-nxxp-0', 'eu']]);
 });
 
-test('the breakdown leads with the header block, then code, data and blobs, leaving the rest of the ROM empty', () => {
+test('the breakdown is one bar of text-free part buttons, header block first, leaving the rest of the ROM empty', () => {
   const [us, eu] = parseProgress(progress, ['us', 'eu']);
   const html = breakdownHtml(us);
-  assert.match(html, /<div class="bar"><button type="button" class="header-block" aria-haspopup="dialog"[^>]*>header<\/button><span class="parts">/);
-  const parts = [...html.matchAll(/<i class="part-(\w+)" style="width:([\d.]+)%"/g)].map((m) => [m[1], Number(m[2])]);
-  assert.deepEqual(parts.map(([k]) => k), ['code', 'data', 'blobs']);
-  assert.ok(Math.abs(parts.reduce((a, [, w]) => a + w, 0) - ((832 + 256 + 6208) / 131072) * 100) < 0.01);
+  assert.match(html, /<div class="bar"><span class="parts"><button type="button" class="part part-header" data-part="header"[^>]*><\/button>/);
+  assert.doesNotMatch(html.split('<p class="parts-key">')[0], />[a-z]/);
+  const parts = [...html.matchAll(/class="part part-(\w+)" data-part="\w+" style="width:([\d.]+)%"/g)].map((m) => [m[1], Number(m[2])]);
+  assert.deepEqual(parts.map(([k]) => k), ['header', 'code', 'data', 'blobs']);
+  assert.ok(Math.abs(parts.reduce((a, [, w]) => a + w, 0) - ((4096 + 832 + 256 + 6208) / 131072) * 100) < 0.01);
   assert.match(html, /blobs <b>4\.7 %<\/b>/);
   assert.doesNotMatch(html, /unknown|platform/);
-  assert.deepEqual([...breakdownHtml(eu).matchAll(/part-(\w+)" style/g)].map((m) => m[1]), ['code']);
+  assert.deepEqual([...breakdownHtml(eu).matchAll(/data-part="(\w+)" style/g)].map((m) => m[1]), ['header', 'code']);
   assert.equal(percentOf(1, 100000), '< 0.1 %');
   assert.equal(percentOf(0, 10), '0.0 %');
 });
@@ -73,8 +74,8 @@ test('the breakdown leads with the header block, then code, data and blobs, leav
 test('header rows are parsed fields in hex and words only, never bytes', () => {
   const [us] = parseProgress(progress, ['us']);
   assert.deepEqual(headerRows(us.header), [
-    ['size', '4,096 bytes with the boot code'], ['internal name', 'Example Game'], ['game id', 'NXXE'], ['country', 'North America'], ['version', '1'], ['release', 'libultra 2.0K'],
-    ['entry point', '0x80000400'], ['clock rate', '0x0000000F'], ['pi settings', 'latency 0x40 · pulse width 0x12 · page size 7 · release 3'],
+    ['size', '4,096 bytes'], ['internal name', 'Example Game'], ['game id', 'NXXE'], ['country', 'North America'], ['version', '1'], ['release', 'libultra 2.0K'],
+    ['entry point', '0x80000400'], ['clock rate', '0x0000000F'], ['pi latency', '0x40'], ['pi pulse width', '0x12'], ['pi page size', '7'], ['pi release', '3'],
     ['crc1', '0x12345678'], ['crc2', '0x9ABCDEF0'],
   ]);
 });
@@ -196,4 +197,12 @@ test('versionFromHash picks the listed version a hash names and nothing else', (
   assert.equal(versionFromHash('#ragewars-decomp-eu', repo, versions), null);
   assert.equal(versionFromHash('', repo, versions), null);
   assert.equal(versionFromHash('#%E0%A4%A', repo, versions), null);
+});
+
+test('a part of the bar opens one fact per row: size, share of the ROM, and how much is done', () => {
+  const [us] = parseProgress(progress, ['us']);
+  assert.deepEqual(partRows(us, 'header'), headerRows(us.header));
+  const rows = partRows(us, 'blobs');
+  assert.deepEqual(rows.map(([k]) => k), ['size', 'share of rom', 'decoded', 'decoded share']);
+  assert.ok(rows.every(([, v]) => !/·|,\s[a-z]/.test(v)));
 });

@@ -3,20 +3,6 @@
   "handle": "mo",
   "url": "https://itsmo.me",
   "tagline": "software developer @ AWS Vancouver",
-  "links": [
-    {
-      "label": "email",
-      "href": "mailto:mo@itsmo.me"
-    },
-    {
-      "label": "github",
-      "href": "https://github.com/melalawi"
-    },
-    {
-      "label": "linkedin",
-      "href": "https://www.linkedin.com/in/melalawi"
-    }
-  ],
   "contact": {
     "action": "https://formspree.io/mpzlkyzz",
     "next": "/thanks",

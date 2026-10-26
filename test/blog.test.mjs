@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupByYear, parsePost, sortPosts, tagIndex, tagSlug } from '../build/blog.mjs';
+import { groupByYear, parsePost, sortPosts } from '../build/blog.mjs';
 import { rss } from '../build/rss.mjs';
 
 const text = (date, tags = '[]', summary = 'One line.') =>
@@ -41,15 +41,11 @@ test('groupByYear keeps years newest first', () => {
   );
 });
 
-test('tagIndex merges tags by slug and lists posts newest first', () => {
-  assert.equal(tagSlug('C++ / N64'), 'c-n64');
-  assert.deepEqual(
-    tagIndex(posts).map((t) => [t.slug, t.posts.map((p) => p.slug)]),
-    [
-      ['decomp', ['a', 'b']],
-      ['retro', ['b', 'old']],
-    ],
-  );
+test('updated is the last edit date: the post date when absent, never before it', () => {
+  assert.equal(parsePost('2026/10-14-a.md', text('2026-10-14')).updated, '2026-10-14');
+  const edited = `---\ntitle: t\ndate: 2026-10-14\nupdated: 2026-10-20\nsummary: s\n---\nx\n`;
+  assert.equal(parsePost('2026/10-14-a.md', edited).updated, '2026-10-20');
+  assert.throws(() => parsePost('2026/10-14-a.md', edited.replace('2026-10-20', '2026-10-01')), /before its date/);
 });
 
 test('rss escapes titles and keeps post order', () => {
